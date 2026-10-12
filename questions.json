@@ -626,7 +626,7 @@
   "mech": "expanding().mean() includes the current transaction, so the feature contains the thing you're trying to judge.",
   "breaks": "shift(1) before expanding fixes it. Leaked features look great in training and fail in production.",
   "contrast": "Including the current row is fine for descriptive stats, not for features that predict it.",
-  "details": "`expanding().mean()` includes the current transaction, so the feature leaks the amount it's meant to score. A $100 spike shows a prior average of 50 instead of 25, which makes anomalies look less anomalous in training than they will at serving time. The first row should be NaN, not the amount itself. Shift by one within each user before averaging.",
+  "details": "`expanding().mean()` includes the current transaction, so the feature leaks the amount it's meant to score. A \\$100 spike shows a prior average of 50 instead of 25, which makes anomalies look less anomalous in training than they will at serving time. The first row should be NaN, not the amount itself. Shift by one within each user before averaging.",
   "why": "Feature leakage: includes the current row"
  },
  {
@@ -636,9 +636,9 @@
   "difficulty": "Easy",
   "title": "At least one six",
   "prompt": "You roll a fair die 4 times. What is the probability of getting **at least one 6**?",
-  "ai": "P(no 6 in one roll) = 5/6, so P(no 6 in 4 rolls) = (5/6)^4 ≈ 0.482. Therefore P(at least one 6) = 1 − 0.482 ≈ **0.518**.",
+  "ai": "Count the ways it fails: $P(\\text{no 6 in one roll}) = \\tfrac{5}{6}$, so $P(\\text{no 6 in 4 rolls}) = (\\tfrac{5}{6})^4 \\approx 0.482$. Therefore $P(\\text{at least one 6}) = 1 - 0.482 \\approx$ **0.518**.",
   "verdict": "correct",
-  "fix": "1 − (5/6)^4 = 671/1296 ≈ 0.518",
+  "fix": "$$1 - \\left(\\tfrac{5}{6}\\right)^4 = \\tfrac{671}{1296} \\approx 0.518$$",
   "lang": "text",
   "bug": "",
   "track": "general",
@@ -646,7 +646,7 @@
   "mech": "The chance of no six in four rolls is easy to compute, and everything else has at least one six.",
   "breaks": "The complement avoids double-counting overlaps. Adding 1/6 four times counts some outcomes twice.",
   "contrast": "For 'exactly one,' you'd count arrangements instead.",
-  "details": "The complement rule is the cleanest approach. A common trap is adding 4 × 1/6 = 0.667, which double-counts overlapping outcomes.",
+  "details": "The complement rule is the cleanest approach. A common trap is adding $4 \\times \\tfrac{1}{6} = 0.667$, which double-counts overlapping outcomes.",
   "why": "The chance of no six in four rolls is easy to compute, and everything else has at least one six."
  },
  {
@@ -676,17 +676,17 @@
   "difficulty": "Easy",
   "title": "95% CI for a mean",
   "prompt": "A sample of n = 100 delivery times has mean 50 min and sample SD 10 min. Give an approximate 95% confidence interval for the mean.",
-  "ai": "SE = 10/√100 = 1. CI = 50 ± 1.96 × 1 = **[48.04, 51.96]** minutes. (The t critical value with 99 df is 1.984, giving [48.02, 51.98], which is nearly identical.)",
+  "ai": "$SE = 10/\\sqrt{100} = 1$, so $CI = 50 \\pm 1.96 \\times 1 =$ **[48.04, 51.96]** minutes. (The t critical value with 99 df is 1.984, giving [48.02, 51.98], which is nearly identical.)",
   "verdict": "correct",
   "fix": "[48.04, 51.96] (z) or [48.02, 51.98] (t, 99 df)",
   "lang": "text",
   "bug": "",
   "track": "general",
   "model": "Averages wobble much less than individuals.",
-  "mech": "The uncertainty of the mean shrinks with the square root of the sample size, so the CI uses SD/√n, not SD.",
+  "mech": "The uncertainty of the mean shrinks with the square root of the sample size, so the CI uses $SD/\\sqrt{n}$, not SD.",
   "breaks": "Using the raw SD gives a range for single deliveries, not for the average.",
   "contrast": "A prediction interval for one new delivery should be wide (about ±20 min).",
-  "details": "The CI uses the standard error, SD/√n, not the SD. A common slip is 50 ± 1.96 × 10, which is a range for individual deliveries (a prediction-style interval), not for the mean.",
+  "details": "The CI uses the standard error, $SD/\\sqrt{n}$, not the SD. A common slip is $50 \\pm 1.96 \\times 10$, which is a range for individual deliveries (a prediction-style interval), not for the mean.",
   "why": "The uncertainty of the mean shrinks with the square root of the sample size, so the CI uses SD/√n, not SD."
  },
  {
@@ -699,7 +699,7 @@
   "ai": "The detector is 95% accurate at catching fraud, so a flagged transaction is fraud with probability **95%**.",
   "verdict": "wrong",
   "bug": "Base-rate neglect (confuses P(flag|fraud) with P(fraud|flag))",
-  "fix": "P(fraud|flag) = 0.95×0.01 / (0.95×0.01 + 0.05×0.99) = 0.0095/0.059 ≈ **16.1%**.",
+  "fix": "$$P(\\text{fraud}\\mid\\text{flag}) = \\frac{0.95 \\times 0.01}{0.95 \\times 0.01 + 0.05 \\times 0.99} = \\frac{0.0095}{0.059} \\approx 16.1\\%$$",
   "lang": "text",
   "track": "general",
   "model": "A rare event plus a noisy detector means most alarms are false.",
@@ -707,7 +707,8 @@
   "breaks": "Always start from the base rate. The detector's hit rate is P(flag | fraud), which isn't what you need.",
   "contrast": "When fraud is common, say 50%, the flag really would be about 95% reliable.",
   "details": "It ignores the 1% base rate. Most flags come from the huge pool of legitimate transactions.",
-  "why": "Base-rate neglect (confuses P(flag|fraud) with P(fraud|flag))"
+  "why": "Base-rate neglect (confuses P(flag|fraud) with P(fraud|flag))",
+  "vis": "| Per 10,000 transactions | Flagged | Not flagged |\n|---|---:|---:|\n| Fraud (100) | 95 | 5 |\n| Legit (9,900) | 495 | 9,405 |"
  },
  {
   "id": "st-05",
@@ -716,7 +717,7 @@
   "difficulty": "Medium",
   "title": "Two heads in a row",
   "prompt": "Flip a fair coin until you get two heads in a row. What's the expected number of flips?",
-  "ai": "Let E = expected flips from scratch and E1 = expected flips when the last flip was H. E = 1 + ½E1 + ½E and E1 = 1 + ½·0 + ½E. Solving: E = 2 + E1 and E1 = 1 + E/2, so E = 3 + E/2 → **E = 6**.",
+  "ai": "Let $E$ = expected flips from scratch and $E_1$ = expected flips when the last flip was H. $$E = 1 + \\tfrac12 E_1 + \\tfrac12 E, \\qquad E_1 = 1 + \\tfrac12 \\cdot 0 + \\tfrac12 E$$ Solving: $E = 2 + E_1$ and $E_1 = 1 + E/2$, so $E = 3 + E/2$, giving **E = 6**.",
   "verdict": "correct",
   "fix": "E = 6",
   "lang": "text",
@@ -756,13 +757,13 @@
   "difficulty": "Medium",
   "title": "SE of a conversion rate",
   "prompt": "400 visitors, 40 conversions. What's the standard error of the conversion rate, and an approximate 95% CI?",
-  "ai": "p̂ = 0.10. SE = √(p̂(1−p̂)/n) = √(0.09/400) = **0.015**. 95% CI ≈ 0.10 ± 1.96 × 0.015 = **[0.071, 0.129]**.",
+  "ai": "$\\hat p = 0.10$, so $SE = \\sqrt{\\hat p(1-\\hat p)/n} = \\sqrt{0.09/400} =$ **0.015**. 95% CI $\\approx 0.10 \\pm 1.96 \\times 0.015 =$ **[0.071, 0.129]**.",
   "verdict": "correct",
   "fix": "SE = 0.015; CI ≈ [0.071, 0.129]",
   "lang": "text",
   "bug": "",
   "track": "general",
-  "model": "A proportion is just an average of 0s and 1s, so its wobble is √(p(1−p)/n).",
+  "model": "A proportion is just an average of 0s and 1s, so its wobble is $\\sqrt{p(1-p)/n}$.",
   "mech": "With n = 400 and p = 0.1, the SE is 0.015, and the normal-approximation interval is fine.",
   "breaks": "It breaks for small n or p near 0/1. Use Wilson there.",
   "contrast": "Wilson recenters and stays inside [0,1].",
@@ -776,10 +777,10 @@
   "difficulty": "Hard",
   "title": "Shared birthday in a team of 23",
   "prompt": "In a team of 23 people (365 equally likely birthdays), what's the probability that at least two share a birthday?",
-  "ai": "There are C(23,2) = 253 pairs, each matching with probability 1/365, so P ≈ 253/365 ≈ **0.693**.",
+  "ai": "There are $\\binom{23}{2} = 253$ pairs, each matching with probability $1/365$, so $P \\approx 253/365 \\approx$ **0.693**.",
   "verdict": "wrong",
   "bug": "Union bound treated as exact probability",
-  "fix": "P = 1 − ∏_{k=0}^{22} (365−k)/365 ≈ **0.507**. (The Poisson approximation 1 − e^(−253/365) ≈ 0.50 is also close.)",
+  "fix": "$$P = 1 - \\prod_{k=0}^{22} \\frac{365-k}{365} \\approx 0.507$$ (The Poisson approximation $1 - e^{-253/365} \\approx 0.50$ is also close.)",
   "lang": "text",
   "track": "general",
   "model": "Adding overlapping chances counts the overlaps twice.",
@@ -795,8 +796,8 @@
   "sub": "Variance",
   "difficulty": "Hard",
   "title": "Variance of a sum",
-  "prompt": "X has variance 1, Y has variance 4, and corr(X, Y) = 0.5. What is Var(X + Y) and Var(X − Y)?",
-  "ai": "Cov = ρ·σx·σy = 0.5 × 1 × 2 = 1. Var(X+Y) = 1 + 4 + 2(1) = **7**. Var(X−Y) = 1 + 4 − 2(1) = **3**.",
+  "prompt": "X has variance 1, Y has variance 4, and $\\operatorname{corr}(X, Y) = 0.5$. What is $\\operatorname{Var}(X + Y)$ and $\\operatorname{Var}(X - Y)$?",
+  "ai": "$\\operatorname{Cov} = \\rho\\,\\sigma_x\\sigma_y = 0.5 \\times 1 \\times 2 = 1$.\n\n$$\\operatorname{Var}(X+Y) = 1 + 4 + 2(1) = 7 \\qquad \\operatorname{Var}(X-Y) = 1 + 4 - 2(1) = 3$$\n\nSo **7** and **3**.",
   "verdict": "correct",
   "fix": "7 and 3",
   "lang": "text",
@@ -827,7 +828,8 @@
   "breaks": "Fix the sample size in advance, or use sequential methods built for peeking.",
   "contrast": "Looking without stopping on it (just monitoring for bugs) is fine.",
   "details": "Each look is another chance for noise to cross 0.05. With daily looks over a few weeks, the real false-positive rate can be 20–30%, not 5%.",
-  "why": "Peeking inflates false positives"
+  "why": "Peeking inflates false positives",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Under no effect, a daily p-value wanders and will dip below 0.05 by chance\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">days</text><text class=\"tx\" x=\"34\" y=\"14\">p-value</text><path class=\"ax2\" d=\"M30,132.5 L330,132.5\"/><text class=\"tx\" x=\"326\" y=\"128.5\" text-anchor=\"end\">0.05</text><path class=\"ln\" d=\"M30.0,82.5 L44.8,41.7 L59.5,61.4 L74.2,109.7 L89.0,116.3 L103.8,74.5 L118.5,46.7 L133.2,71.4 L148.0,110.2 L162.8,107.2 L177.5,69.3 L192.2,52.6 L207.0,79.3 L221.8,108.9 L236.5,99.1 L251.2,66.4 L266.0,58.7 L280.8,85.2 L295.5,106.2 L310.2,92.2 L325.0,65.4\"/><circle class=\"dot\" cx=\"133.25\" cy=\"71.44478345964225\" r=\"4\"/></svg><figcaption>Under no effect, a daily p-value wanders and will dip below 0.05 by chance</figcaption></figure>"
  },
  {
   "id": "ab-02",
@@ -855,15 +857,15 @@
   "sub": "Power",
   "difficulty": "Medium",
   "title": "Sample size per arm",
-  "prompt": "Baseline conversion is 10%. We want to detect an absolute lift of 1 percentage point (10% → 11%), two-sided α = 0.05, 80% power. Roughly how many users per arm?",
-  "ai": "n ≈ (z₀.₉₇₅ + z₀.₈)² · [p₁(1−p₁) + p₂(1−p₂)] / δ² = (1.96 + 0.84)² × (0.09 + 0.0979) / 0.01² ≈ 7.84 × 0.1879 / 0.0001 ≈ **14,700 users per arm**.",
+  "prompt": "Baseline conversion is 10%. We want to detect an absolute lift of 1 percentage point (10% → 11%), two-sided $\\alpha = 0.05$, 80% power. Roughly how many users per arm?",
+  "ai": "$$n \\approx \\frac{(z_{0.975} + z_{0.8})^2\\,[p_1(1-p_1) + p_2(1-p_2)]}{\\delta^2} = \\frac{(1.96 + 0.84)^2 \\times 0.1879}{0.01^2}$$ That's about **14,700 users per arm**.",
   "verdict": "correct",
   "fix": "≈ 14.7k per arm (statsmodels' arcsine method gives ≈ 14.75k)",
   "lang": "text",
   "bug": "",
   "track": "general",
   "model": "Sample size is noise ÷ signal, squared.",
-  "mech": "The required n grows with variance and with 1/effect². For 10%→11%, that's about 14k per arm.",
+  "mech": "The required n grows with variance and with $1/\\text{effect}^2$. For 10%→11%, that's about 14k per arm.",
   "breaks": "Mixing up absolute and relative lifts changes n by 100×.",
   "contrast": "A 1% relative lift (10%→10.1%) needs far more users.",
   "details": "This is the standard two-proportion formula. A common mistake is treating 1pp as a 1% *relative* lift (10% → 10.1%), which needs about 100× more users.",
@@ -886,8 +888,9 @@
   "mech": "At this scale, a 50/50 split should be much closer, so the chi-square p is tiny.",
   "breaks": "SRM means something broke in assignment or logging, and every metric is suspect.",
   "contrast": "A 1,600 gap on a few thousand users could be chance.",
-  "details": "A chi-square test against 50/50 gives χ² = 25.6, p ≈ 4×10⁻⁷. At this scale, a 1,600-user gap is not chance. SRM usually means broken assignment, bot filtering, redirects, or logging loss that differs by arm, and that can bias every metric.",
-  "why": "Ignores sample ratio mismatch (SRM)"
+  "details": "A chi-square test against 50/50 gives $\\chi^2 = 25.6$, $p \\approx 4 \\times 10^{-7}$. At this scale, a 1,600-user gap is not chance. SRM usually means broken assignment, bot filtering, redirects, or logging loss that differs by arm, and that can bias every metric.",
+  "why": "Ignores sample ratio mismatch (SRM)",
+  "vis": "| Arm | Expected | Observed | Gap |\n|---|---:|---:|---:|\n| Control | 50,000 | 50,800 | +800 |\n| Treatment | 50,000 | 49,200 | −800 |"
  },
  {
   "id": "ab-05",
@@ -906,7 +909,7 @@
   "mech": "20 tests at 5% gives about a 64% chance of at least one false positive.",
   "breaks": "Pre-register a primary metric, then correct the rest.",
   "contrast": "With one pre-registered primary metric, 5% really is 5%.",
-  "details": "With 20 independent metrics at α = 0.05, you expect about 1 false positive even if nothing changed. P(at least one) = 1 − 0.95²⁰ ≈ 64%. And the pre-registered primary metric is flat.",
+  "details": "With 20 independent metrics at $\\alpha = 0.05$, you expect about 1 false positive even if nothing changed. $P(\\text{at least one}) = 1 - 0.95^{20} \\approx 64\\%$. And the pre-registered primary metric is flat.",
   "why": "Multiple comparisons / cherry-picking"
  },
  {
@@ -916,7 +919,7 @@
   "difficulty": "Medium",
   "title": "Is a 10% → 11% lift significant?",
   "prompt": "Control: 1,000 conversions of 10,000. Treatment: 1,100 of 10,000. Is the difference significant at α = 0.05 (two-sided)?",
-  "ai": "Pooled p = 0.105, SE = √(0.105 × 0.895 × (2/10000)) ≈ 0.00434. z = 0.01 / 0.00434 ≈ **2.31**, p ≈ **0.021**. Yes, significant at 0.05. 95% CI for the lift ≈ [0.15pp, 1.85pp].",
+  "ai": "Pooled $p = 0.105$, so $SE = \\sqrt{0.105 \\times 0.895 \\times \\tfrac{2}{10000}} \\approx 0.00434$ and $z = 0.01 / 0.00434 \\approx$ **2.31**, $p \\approx$ **0.021**. Yes, significant at 0.05. 95% CI for the lift ≈ [0.15pp, 1.85pp].",
   "verdict": "correct",
   "fix": "z ≈ 2.31, p ≈ 0.021",
   "lang": "text",
@@ -927,7 +930,8 @@
   "breaks": "This is the standard large-sample approach. Breaks for tiny samples.",
   "contrast": "A chi-square test on the 2×2 table gives the same answer.",
   "details": "The pooled SE is used for the test and the unpooled SE (≈ 0.00436) for the CI, which is the textbook pairing. The CI excludes 0, consistent with p < 0.05.",
-  "why": "Use the pooled SE for the test and the unpooled SE for the CI."
+  "why": "Use the pooled SE for the test and the unpooled SE for the CI.",
+  "vis": "| Arm | Users | Conversions | Rate |\n|---|---:|---:|---:|\n| Control | 10,000 | 1,000 | 10.0% |\n| Treatment | 10,000 | 1,100 | 11.0% |"
  },
  {
   "id": "ab-07",
@@ -936,7 +940,7 @@
   "difficulty": "Hard",
   "title": "CTR test randomized by user",
   "prompt": "We randomize by user and measure click-through rate = clicks / pageviews. Treatment CTR 5.2% on 1.2M pageviews; control 5.0% on 1.2M pageviews (≈ 60k users per arm). Evaluate the AI's analysis.",
-  "ai": "Treat each pageview as a Bernoulli trial: SE = √(p(1−p)(1/n₁ + 1/n₂)) with n = 1.2M per arm gives z ≈ 7.0. That's overwhelmingly significant.",
+  "ai": "Treat each pageview as a Bernoulli trial: $$SE = \\sqrt{p(1-p)\\left(\\tfrac{1}{n_1} + \\tfrac{1}{n_2}\\right)}$$ with $n = 1.2\\text{M}$ per arm gives $z \\approx 7.0$. That's overwhelmingly significant.",
   "verdict": "wrong",
   "bug": "Unit of analysis ≠ unit of randomization",
   "fix": "Compute per-user clicks and pageviews, then the variance of the ratio of means with the delta method (or bootstrap over users). The real z is usually much smaller and may not be significant.",
@@ -956,7 +960,7 @@
   "difficulty": "Hard",
   "title": "How much does CUPED help?",
   "prompt": "Using pre-experiment spend as a CUPED covariate, the correlation between pre-period and in-experiment spend is 0.6. How much variance reduction should we expect, and what does that mean for sample size?",
-  "ai": "CUPED's adjusted metric Y − θ(X − X̄), with θ = Cov(X,Y)/Var(X), has variance Var(Y)(1 − ρ²). With ρ = 0.6, variance falls by **36%**, so for the same power you need about 64% of the original sample, roughly a 1.56× effective traffic boost.",
+  "ai": "CUPED's adjusted metric $Y - \\theta(X - \\bar X)$, with $\\theta = \\operatorname{Cov}(X,Y)/\\operatorname{Var}(X)$, has variance $\\operatorname{Var}(Y)(1 - \\rho^2)$. With $\\rho = 0.6$, variance falls by **36%**, so for the same power you need about 64% of the original sample, roughly a 1.56× effective traffic boost.",
   "verdict": "correct",
   "fix": "36% variance reduction → ~0.64× sample size",
   "lang": "text",
@@ -966,7 +970,7 @@
   "mech": "Pre-period behavior explains part of the noise. Removing it shrinks the variance by the correlation squared.",
   "breaks": "The covariate has to come from before treatment.",
   "contrast": "With zero correlation, CUPED does nothing.",
-  "details": "The variance factor is 1 − ρ², and required n scales linearly with variance. The covariate has to be measured before treatment, so treatment can't affect it.",
+  "details": "The variance factor is $1 - \\rho^2$, and required n scales linearly with variance. The covariate has to be measured before treatment, so treatment can't affect it.",
   "why": "Pre-period behavior explains part of the noise."
  },
  {
@@ -1055,11 +1059,11 @@
   "sub": "Metric definitions",
   "difficulty": "Medium",
   "title": "ARPU this month",
-  "prompt": "This month: 10,000 active users, of whom 1,000 paid. Total revenue $50,000. What's ARPU?",
-  "ai": "ARPU = revenue / paying users = $50,000 / 1,000 = **$50**.",
+  "prompt": "This month: 10,000 active users, of whom 1,000 paid. Total revenue \\$50,000. What's ARPU?",
+  "ai": "ARPU = revenue / paying users = \\$50,000 / 1,000 = **\\$50**.",
   "verdict": "wrong",
   "bug": "Wrong denominator (that's ARPPU)",
-  "fix": "ARPU = $50,000 / 10,000 = **$5**. ARPPU = $50. Payer conversion = 10%.",
+  "fix": "ARPU = \\$50,000 / 10,000 = **\\$5**. ARPPU = \\$50. Payer conversion = 10%.",
   "lang": "text",
   "track": "general",
   "model": "ARPU spreads revenue over everyone; ARPPU spreads it over payers only.",
@@ -1067,7 +1071,8 @@
   "breaks": "Name the denominator.",
   "contrast": "ARPPU is the right metric when you're asking how much payers spend.",
   "details": "ARPU divides by **all** active users, and dividing by paying users gives ARPPU. Mixing them up overstates per-user monetization 10× here.",
-  "why": "Wrong denominator (that's ARPPU)"
+  "why": "Wrong denominator (that's ARPPU)",
+  "vis": "| Count | Value |\n|---|---:|\n| Active users | 10,000 |\n| Paying users | 1,000 |\n| Revenue | \\$50,000 |"
  },
  {
   "id": "pm-05",
@@ -1136,7 +1141,7 @@
   "difficulty": "Medium",
   "title": "Logistic regression coefficient",
   "prompt": "In a churn logistic regression, the coefficient on `has_support_ticket` (0/1) is 0.7. Interpret it.",
-  "ai": "Holding other features constant, having a support ticket multiplies the **odds** of churn by e^0.7 ≈ **2.01**, roughly doubling the odds. That's not the same as doubling the probability, and it's an association, not necessarily causal.",
+  "ai": "Holding other features constant, having a support ticket multiplies the **odds** of churn by $e^{0.7} \\approx$ **2.01**, roughly doubling the odds. That's not the same as doubling the probability, and it's an association, not necessarily causal.",
   "verdict": "correct",
   "fix": "Odds ratio ≈ 2.01",
   "lang": "text",
@@ -1176,7 +1181,7 @@
   "difficulty": "Medium",
   "title": "Precision, recall, F1",
   "prompt": "Confusion matrix: TP = 80, FP = 20, FN = 40, TN = 860. Compute precision, recall, and F1.",
-  "ai": "Precision = 80/(80+20) = **0.80**. Recall = 80/(80+40) = **0.667**. F1 = 2PR/(P+R) = 2 × 0.8 × 0.667 / 1.467 ≈ **0.727**.",
+  "ai": "$$\\text{Precision} = \\tfrac{80}{80+20} = 0.80 \\qquad \\text{Recall} = \\tfrac{80}{80+40} = 0.667$$ $$F_1 = \\frac{2PR}{P+R} = \\frac{2 \\times 0.8 \\times 0.667}{1.467} \\approx 0.727$$",
   "verdict": "correct",
   "fix": "0.80 / 0.667 / 0.727",
   "lang": "text",
@@ -1187,7 +1192,8 @@
   "breaks": "F1 ignores true negatives and the costs of each error type.",
   "contrast": "With different error costs, pick the threshold by cost instead.",
   "details": "All three are correct. Note F1 is the harmonic mean, which is lower than the arithmetic mean (0.733).",
-  "why": "F1 balances the two with a harmonic mean, which punishes imbalance."
+  "why": "F1 balances the two with a harmonic mean, which punishes imbalance.",
+  "vis": "| | Predicted + | Predicted − |\n|---|---:|---:|\n| **Actual +** | TP = 80 | FN = 40 |\n| **Actual −** | FP = 20 | TN = 860 |"
  },
  {
   "id": "ml-05",
@@ -1206,7 +1212,7 @@
   "mech": "With correlated predictors, each coefficient measures the effect holding the other fixed, and the SEs blow up.",
   "breaks": "The feature can matter a lot alone and still be 'insignificant' next to its twin.",
   "contrast": "Drop one twin, and the other becomes significant.",
-  "details": "With highly correlated predictors, the standard errors inflate (VIF ≈ 1/(1−0.95²) ≈ 10), and each coefficient only measures the effect *holding the other fixed*. num_rooms can be strongly tied to price on its own and still be insignificant next to sqft.",
+  "details": "With highly correlated predictors, the standard errors inflate ($\\text{VIF} \\approx 1/(1-0.95^2) \\approx 10$), and each coefficient only measures the effect *holding the other fixed*. num_rooms can be strongly tied to price on its own and still be insignificant next to sqft.",
   "why": "Misreading coefficients under multicollinearity"
  },
  {
@@ -1216,7 +1222,7 @@
   "difficulty": "Hard",
   "title": "L1 vs L2",
   "prompt": "When would you choose L1 (lasso) over L2 (ridge) regularization? Evaluate the AI.",
-  "ai": "L1 penalizes |β|, and its corners push some coefficients to exactly zero, so it does feature selection. Pick it when you expect few true signals among many features or need a sparse, interpretable model. L2 penalizes β², shrinking coefficients smoothly without zeroing them, and handles correlated features better (it spreads weight across them, while lasso picks one somewhat arbitrarily). For many correlated features with some sparsity, elastic net combines both. Standardize features first in every case, since the penalty depends on scale.",
+  "ai": "L1 penalizes $|\\beta|$, and its corners push some coefficients to exactly zero, so it does feature selection. Pick it when you expect few true signals among many features or need a sparse, interpretable model. L2 penalizes $\\beta^2$, shrinking coefficients smoothly without zeroing them, and handles correlated features better (it spreads weight across them, while lasso picks one somewhat arbitrarily). For many correlated features with some sparsity, elastic net combines both. Standardize features first in every case, since the penalty depends on scale.",
   "verdict": "correct",
   "fix": "—",
   "lang": "text",
@@ -1335,7 +1341,7 @@
   "sub": "Correlation",
   "difficulty": "Medium",
   "title": "Zero correlation",
-  "prompt": "X ~ Uniform(−1, 1) and Y = X². The AI computes corr(X, Y).",
+  "prompt": "$X \\sim \\text{Uniform}(-1, 1)$ and $Y = X^2$. The AI computes $\\operatorname{corr}(X, Y)$.",
   "ai": "corr(X, Y) = 0, so X and Y are **independent**.",
   "verdict": "wrong",
   "bug": "Zero correlation ≠ independence",
@@ -1343,11 +1349,12 @@
   "track": "general",
   "lang": "text",
   "model": "Correlation is a straight-line detector.",
-  "mech": "X² is completely determined by X, but rises on both sides of 0, so the straight-line fit is flat.",
+  "mech": "$X^2$ is completely determined by $X$, but rises on both sides of 0, so the straight-line fit is flat.",
   "breaks": "Zero correlation means no linear relationship, not no relationship.",
   "contrast": "For jointly normal variables, zero correlation does mean independence.",
   "details": "The correlation is 0 (by symmetry), but Y is completely determined by X. Pearson correlation only measures linear association. It implies independence only in special cases, e.g. jointly Gaussian variables.",
-  "why": "Zero correlation ≠ independence"
+  "why": "Zero correlation ≠ independence",
+  "vis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Y is fully determined by X, yet symmetric around 0\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">X</text><text class=\"tx\" x=\"34\" y=\"14\">Y = X²</text><path class=\"ln\" d=\"M30.0,26.2 L37.4,37.2 L44.8,47.6 L52.1,57.5 L59.5,66.7 L66.9,75.5 L74.2,83.6 L81.6,91.2 L89.0,98.2 L96.4,104.7 L103.8,110.6 L111.1,116.0 L118.5,120.8 L125.9,125.0 L133.2,128.6 L140.6,131.7 L148.0,134.2 L155.4,136.2 L162.8,137.6 L170.1,138.5 L177.5,138.8 L184.9,138.5 L192.2,137.6 L199.6,136.2 L207.0,134.2 L214.4,131.7 L221.8,128.6 L229.1,125.0 L236.5,120.8 L243.9,116.0 L251.2,110.6 L258.6,104.7 L266.0,98.2 L273.4,91.2 L280.8,83.6 L288.1,75.5 L295.5,66.7 L302.9,57.5 L310.2,47.6 L317.6,37.2 L325.0,26.2\"/><path class=\"ax2\" d=\"M177.5,12 L177.5,145\"/><text class=\"tx\" x=\"34\" y=\"160\" text-anchor=\"start\">−1</text><text class=\"tx\" x=\"325\" y=\"160\" text-anchor=\"end\">1</text></svg><figcaption>Y is fully determined by X, yet symmetric around 0</figcaption></figure>"
  },
  {
   "id": "st-14",
@@ -1356,17 +1363,17 @@
   "difficulty": "Medium",
   "title": "Expected max of two dice",
   "prompt": "Roll two fair dice. What's the expected value of the maximum?",
-  "ai": "P(max = k) = (2k − 1)/36, so E[max] = Σ k(2k − 1)/36 = 161/36 ≈ **4.47**.",
+  "ai": "$P(\\max = k) = \\frac{2k - 1}{36}$, so $$E[\\max] = \\sum_{k=1}^{6} k\\,\\frac{2k-1}{36} = \\frac{161}{36} \\approx 4.47$$",
   "verdict": "correct",
-  "fix": "161/36 ≈ 4.47",
+  "fix": "$161/36 \\approx 4.47$",
   "track": "general",
   "lang": "text",
   "bug": "",
   "model": "The max is at most k only if both dice are at most k.",
-  "mech": "P(max ≤ k) = (k/6)². Take differences to get P(max = k), then average.",
+  "mech": "$P(\\max \\le k) = (k/6)^2$. Take differences to get $P(\\max = k)$, then average.",
   "breaks": "The 'CDF first' trick works for any max or min of independent draws.",
   "contrast": "For the min, use P(min > k) instead.",
-  "details": "That's correct. P(max ≤ k) = (k/6)², so P(max = k) = (k² − (k−1)²)/36.",
+  "details": "That's correct. $P(\\max \\le k) = (k/6)^2$, so $P(\\max = k) = \\frac{k^2 - (k-1)^2}{36}$.",
   "why": "P(max ≤ k) = (k/6)²."
  },
  {
@@ -1376,17 +1383,17 @@
   "difficulty": "Easy",
   "title": "No incidents this hour",
   "prompt": "Pager incidents arrive as a Poisson process averaging 3 per hour. What's P(zero incidents in the next hour)?",
-  "ai": "P(0) = e^(−3) ≈ **0.050**.",
+  "ai": "$P(0) = e^{-3} \\approx$ **0.050**.",
   "verdict": "correct",
   "fix": "≈ 0.0498",
   "track": "general",
   "lang": "text",
   "bug": "",
   "model": "A Poisson process is a stream of random arrivals with no memory.",
-  "mech": "With an average of 3 per hour, P(none) = e^(−3) ≈ 5%.",
+  "mech": "With an average of 3 per hour, $P(\\text{none}) = e^{-3} \\approx 5\\%$.",
   "breaks": "It assumes independent arrivals at a constant rate. Incident storms break it.",
   "contrast": "The wait until the next incident has the same answer, from the exponential view.",
-  "details": "That's correct. Equivalently, the wait until the first event is Exponential(rate 3/hr), and P(T > 1) = e^(−3).",
+  "details": "That's correct. Equivalently, the wait until the first event is Exponential(rate 3/hr), and $P(T > 1) = e^{-3}$.",
   "why": "With an average of 3 per hour, P(none) = e^(−3) ≈ 5%."
  },
  {
@@ -1407,7 +1414,8 @@
   "breaks": "Average growth rates with a geometric mean.",
   "contrast": "−50% then +100% gets you back to where you started.",
   "details": "1.5 × 0.5 = 0.75, so the net change is **−25%**. Average growth rates over time with a geometric mean, not an arithmetic one.",
-  "why": "Percent changes compound multiplicatively"
+  "why": "Percent changes compound multiplicatively",
+  "evis": "| Step | Multiplier | Value |\n|---|---:|---:|\n| Start | | 100 |\n| +50% | ×1.5 | 150 |\n| −50% | ×0.5 | **75** |"
  },
  {
   "id": "ml-07",
@@ -1427,7 +1435,8 @@
   "breaks": "Regularize, simplify, add data, or stop early. More complexity makes it worse.",
   "contrast": "Low train and low validation scores would mean underfitting.",
   "details": "A big gap between train and validation means high variance. Regularize, simplify, add data, or use early stopping. More complexity makes it worse.",
-  "why": "That's overfitting (high variance), not underfitting"
+  "why": "That's overfitting (high variance), not underfitting",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"99% train vs 70% validation sits on the overfitting side\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">model complexity</text><text class=\"tx\" x=\"34\" y=\"14\">error</text><path class=\"ln mut\" d=\"M30.0,38.7 L34.9,44.4 L39.8,49.8 L44.8,54.8 L49.7,59.6 L54.6,64.0 L59.5,68.3 L64.4,72.3 L69.3,76.0 L74.2,79.6 L79.2,82.9 L84.1,86.1 L89.0,89.1 L93.9,91.9 L98.8,94.6 L103.8,97.1 L108.7,99.4 L113.6,101.7 L118.5,103.8 L123.4,105.7 L128.3,107.6 L133.2,109.4 L138.2,111.0 L143.1,112.6 L148.0,114.1 L152.9,115.5 L157.8,116.8 L162.8,118.0 L167.7,119.2 L172.6,120.3 L177.5,121.4 L182.4,122.4 L187.3,123.3 L192.2,124.2 L197.2,125.0 L202.1,125.8 L207.0,126.5 L211.9,127.2 L216.8,127.9 L221.8,128.5 L226.7,129.1 L231.6,129.6 L236.5,130.1 L241.4,130.6 L246.3,131.1 L251.2,131.5 L256.2,131.9 L261.1,132.3 L266.0,132.7 L270.9,133.0 L275.8,133.3 L280.8,133.6 L285.7,133.9 L290.6,134.2 L295.5,134.5 L300.4,134.7 L305.3,134.9 L310.2,135.2 L315.2,135.4 L320.1,135.5 L325.0,135.7\"/><path class=\"ln\" d=\"M30.0,51.2 L34.9,56.7 L39.8,61.7 L44.8,66.3 L49.7,70.5 L54.6,74.3 L59.5,77.7 L64.4,80.9 L69.3,83.7 L74.2,86.3 L79.2,88.6 L84.1,90.6 L89.0,92.5 L93.9,94.1 L98.8,95.5 L103.8,96.8 L108.7,97.9 L113.6,98.8 L118.5,99.6 L123.4,100.2 L128.3,100.8 L133.2,101.2 L138.2,101.4 L143.1,101.6 L148.0,101.7 L152.9,101.7 L157.8,101.6 L162.8,101.4 L167.7,101.1 L172.6,100.7 L177.5,100.3 L182.4,99.8 L187.3,99.2 L192.2,98.6 L197.2,97.9 L202.1,97.1 L207.0,96.3 L211.9,95.5 L216.8,94.5 L221.8,93.6 L226.7,92.5 L231.6,91.5 L236.5,90.4 L241.4,89.2 L246.3,88.0 L251.2,86.7 L256.2,85.4 L261.1,84.1 L266.0,82.7 L270.9,81.3 L275.8,79.9 L280.8,78.4 L285.7,76.8 L290.6,75.3 L295.5,73.7 L300.4,72.0 L305.3,70.4 L310.2,68.6 L315.2,66.9 L320.1,65.1 L325.0,63.3\"/><circle class=\"dot\" cx=\"295.5\" cy=\"73.67375648799583\" r=\"4\"/><text class=\"tx\" x=\"295.5\" y=\"66.0\" text-anchor=\"middle\">you are here</text><text class=\"tx\" x=\"323\" y=\"129.0\" text-anchor=\"end\">train</text></svg><figcaption>99% train vs 70% validation sits on the overfitting side</figcaption></figure>"
  },
  {
   "id": "ml-08",
@@ -1447,7 +1456,8 @@
   "breaks": "It's blind to calibration and to the costs at a particular threshold.",
   "contrast": "PR-AUC is more informative for rare positives.",
   "details": "That's correct. It's equivalent to the Mann–Whitney U statistic, normalized.",
-  "why": "It only cares about order, not the actual probability values."
+  "why": "It only cares about order, not the actual probability values.",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 200 200\" role=\"img\" aria-label=\"AUC = 0.82: area under this curve; diagonal = coin flip\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,175 L190,175\"/><text class=\"tx\" x=\"190\" y=\"192\" text-anchor=\"end\">FPR</text><text class=\"tx\" x=\"34\" y=\"14\">TPR</text><path class=\"ax2\" d=\"M30,175 L190,15\"/><path class=\"ln\" d=\"M30.0,175.0 L34.0,162.5 L38.0,150.8 L42.0,139.7 L46.0,129.2 L50.0,119.4 L54.0,110.1 L58.0,101.5 L62.0,93.3 L66.0,85.8 L70.0,78.7 L74.0,72.2 L78.0,66.1 L82.0,60.5 L86.0,55.3 L90.0,50.6 L94.0,46.2 L98.0,42.2 L102.0,38.6 L106.0,35.4 L110.0,32.4 L114.0,29.8 L118.0,27.4 L122.0,25.4 L126.0,23.5 L130.0,21.9 L134.0,20.6 L138.0,19.4 L142.0,18.4 L146.0,17.6 L150.0,16.9 L154.0,16.4 L158.0,15.9 L162.0,15.6 L166.0,15.4 L170.0,15.2 L174.0,15.1 L178.0,15.0 L182.0,15.0 L186.0,15.0 L190.0,15.0\"/></svg><figcaption>AUC = 0.82: area under this curve; diagonal = coin flip</figcaption></figure>"
  },
  {
   "id": "ml-09",
@@ -1527,7 +1537,8 @@
   "breaks": "Treat segment wins as hypotheses: correct for multiple looks, then confirm with a new test.",
   "contrast": "A segment pre-registered before the test is legitimate.",
   "details": "",
-  "why": "Post-hoc segment fishing"
+  "why": "Post-hoc segment fishing",
+  "vis": "| Slice | Lift | p |\n|---|---:|---:|\n| Overall | ~0% | 0.40 |\n| Android (1 of 12 slices) | +4% | 0.03 |\n| Other 11 slices | mixed | > 0.05 |"
  },
  {
   "id": "ab-13",
@@ -1538,7 +1549,7 @@
   "prompt": "A test powered to detect a 2% lift needs 50k users per arm. How many are needed to detect a 1% lift at the same power?",
   "ai": "About **200k per arm**, 4× as many. Noise shrinks with the square root of the sample, so halving the effect you can detect takes 4× the data.",
   "verdict": "correct",
-  "fix": "n ∝ 1/MDE² → 4×",
+  "fix": "$n \\propto 1/\\text{MDE}^2$, so 4×",
   "track": "general",
   "lang": "text",
   "bug": "",
@@ -1655,9 +1666,9 @@
   "difficulty": "Medium",
   "title": "Why 'fit the residuals'?",
   "prompt": "Explain why gradient boosting with squared-error loss is often described as \"fitting trees to residuals.\" Targets are y = [3, 5, 10] and the initial prediction is the mean. What does the first tree fit?",
-  "ai": "With L = ½(y − F)², the negative gradient with respect to the prediction F is −∂L/∂F = y − F, which is exactly the residual. F₀ = mean(y) = 6, so the first tree is fit to the pseudo-residuals **[−3, −1, 4]**. For other losses, the tree fits the negative gradient, which is not a plain residual.",
+  "ai": "With $L = \\tfrac12 (y - F)^2$, the negative gradient with respect to the prediction $F$ is $-\\partial L/\\partial F = y - F$, which is exactly the residual. $F_0 = \\text{mean}(y) = 6$, so the first tree is fit to the pseudo-residuals **[−3, −1, 4]**. For other losses, the tree fits the negative gradient, which is not a plain residual.",
   "verdict": "correct",
-  "fix": "pseudo-residuals = y − F₀ = [3,5,10] − 6 = [−3, −1, 4]",
+  "fix": "Pseudo-residuals: $y - F_0 = [3, 5, 10] - 6 = [-3, -1, 4]$",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
@@ -1666,7 +1677,7 @@
   "mech": "Start with the average. Each new tree looks at how far off the team is for each row and learns a small correction in that direction. For squared error, 'how far off' is literally the residual.",
   "breaks": "Works because each step moves predictions downhill on the loss. For other losses, the 'direction' isn't the plain residual.",
   "contrast": "For log loss, the tree fits 'actual minus predicted probability' instead.",
-  "details": "That's right. Boosting is functional gradient descent: each tree approximates the negative gradient of the loss at the current predictions. For squared error that's the ordinary residual. For absolute error it's sign(y − F), and for log loss it's y − p.",
+  "details": "That's right. Boosting is functional gradient descent: each tree approximates the negative gradient of the loss at the current predictions. For squared error that's the ordinary residual. For absolute error it's $\\operatorname{sign}(y - F)$, and for log loss it's $y - p$.",
   "why": "Start with the average."
  },
  {
@@ -1674,10 +1685,10 @@
   "sub": "Loss & gradients",
   "difficulty": "Hard",
   "title": "Gradient and Hessian of log loss",
-  "prompt": "For binary classification, XGBoost works on the raw score F (log-odds) with p = σ(F). What are the per-row gradient g and Hessian h of the log loss with respect to F?",
-  "ai": "L = −[y log p + (1−y) log(1−p)]. Differentiating with respect to F gives **g = p − y** and **h = p(1 − p)**. So the tree targets −g = y − p, and rows where the model is unsure (p ≈ 0.5) have the largest Hessian.",
+  "prompt": "For binary classification, XGBoost works on the raw score $F$ (log-odds) with $p = \\sigma(F)$. What are the per-row gradient $g$ and Hessian $h$ of the log loss with respect to $F$?",
+  "ai": "$$L = -[\\,y \\log p + (1-y)\\log(1-p)\\,]$$ Differentiating with respect to $F$ gives $g = p - y$ and $h = p(1 - p)$. So the tree targets $-g = y - p$, and rows where the model is unsure ($p \\approx 0.5$) have the largest Hessian.",
   "verdict": "correct",
-  "fix": "g = p − y, h = p(1−p)",
+  "fix": "$g = p - y,\\quad h = p(1-p)$",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
@@ -1686,7 +1697,7 @@
   "mech": "For log loss, the push is 'predicted probability minus truth.' The curvature is largest where the model is unsure (around 50/50) and tiny where it's confident.",
   "breaks": "XGBoost uses both to size each leaf's step (Newton's method). Confident rows barely count, which is why min_child_weight behaves oddly on imbalanced data.",
   "contrast": "Squared error has constant curvature (1), so every row counts equally.",
-  "details": "Both are right. The second-order (Newton) step in XGBoost uses these g and h values. The optimal leaf weight is −Σg/(Σh + λ), and `min_child_weight` limits Σh, not the row count.",
+  "details": "Both are right. The second-order (Newton) step in XGBoost uses these g and h values. The optimal leaf weight is $-\\sum g / (\\sum h + \\lambda)$, and `min_child_weight` limits $\\sum h$, not the row count.",
   "why": "For log loss, the push is 'predicted probability minus truth.' The curvature is largest where the model is unsure (around 50/50) and tiny where it's confident."
  },
  {
@@ -1707,7 +1718,8 @@
   "breaks": "Small steps generalize slightly better, but only if you add trees to match. Let early stopping choose.",
   "contrast": "Doubling the trees along with halving the rate gets you to a similar (often slightly better) model.",
   "details": "Shrinkage and the number of rounds trade off against each other. At half the step size, 500 trees will usually underfit, because training loss hasn't come down as far. You typically need about 2× the rounds, around 1000. Smaller learning rates usually generalize a little better (Friedman 2001), but only when you add trees to match, ideally chosen with early stopping.",
-  "why": "Ignores the learning_rate × n_estimators trade-off"
+  "why": "Ignores the learning_rate × n_estimators trade-off",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Half the learning rate needs about twice the trees to reach its minimum\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">trees</text><text class=\"tx\" x=\"34\" y=\"14\">val loss</text><path class=\"ln mut\" d=\"M30.0,26.2 L34.9,35.0 L39.8,43.0 L44.8,50.2 L49.7,56.7 L54.6,62.5 L59.5,67.8 L64.4,72.6 L69.3,76.9 L74.2,80.8 L79.2,84.3 L84.1,87.4 L89.0,90.3 L93.9,92.8 L98.8,95.1 L103.8,97.2 L108.7,99.1 L113.6,100.7 L118.5,102.3 L123.4,103.6 L128.3,104.8 L133.2,105.9 L138.2,106.9 L143.1,107.7 L148.0,108.5 L152.9,109.2 L157.8,109.8 L162.8,110.3 L167.7,110.8 L172.6,111.2 L177.5,111.6 L182.4,111.9 L187.3,112.2 L192.2,112.4 L197.2,112.6 L202.1,112.8 L207.0,112.9 L211.9,113.1 L216.8,113.2 L221.8,113.2 L226.7,113.3 L231.6,113.3 L236.5,113.3 L241.4,113.4 L246.3,113.3 L251.2,113.3 L256.2,113.3 L261.1,113.3 L266.0,113.2 L270.9,113.2 L275.8,113.1 L280.8,113.1 L285.7,113.0 L290.6,112.9 L295.5,112.8 L300.4,112.7 L305.3,112.7 L310.2,112.6 L315.2,112.5 L320.1,112.4 L325.0,112.3\"/><path class=\"ln\" d=\"M30.0,28.8 L34.9,33.3 L39.8,37.5 L44.8,41.6 L49.7,45.5 L54.6,49.2 L59.5,52.7 L64.4,56.0 L69.3,59.2 L74.2,62.2 L79.2,65.0 L84.1,67.7 L89.0,70.3 L93.9,72.7 L98.8,75.1 L103.8,77.3 L108.7,79.4 L113.6,81.4 L118.5,83.3 L123.4,85.1 L128.3,86.8 L133.2,88.4 L138.2,89.9 L143.1,91.4 L148.0,92.8 L152.9,94.1 L157.8,95.3 L162.8,96.5 L167.7,97.6 L172.6,98.7 L177.5,99.7 L182.4,100.7 L187.3,101.6 L192.2,102.4 L197.2,103.2 L202.1,104.0 L207.0,104.8 L211.9,105.4 L216.8,106.1 L221.8,106.7 L226.7,107.3 L231.6,107.9 L236.5,108.4 L241.4,108.9 L246.3,109.4 L251.2,109.8 L256.2,110.2 L261.1,110.6 L266.0,111.0 L270.9,111.3 L275.8,111.7 L280.8,112.0 L285.7,112.3 L290.6,112.6 L295.5,112.8 L300.4,113.1 L305.3,113.3 L310.2,113.5 L315.2,113.7 L320.1,113.9 L325.0,114.1\"/><path class=\"ax2\" d=\"M177.5,12 L177.5,145\"/><text class=\"tx\" x=\"181.5\" y=\"22\" text-anchor=\"start\">500 trees</text><text class=\"tx\" x=\"323\" y=\"79.5\" text-anchor=\"end\">lr 0.1</text><text class=\"tx g\" x=\"323\" y=\"129.75\" text-anchor=\"end\">lr 0.05</text></svg><figcaption>Half the learning rate needs about twice the trees to reach its minimum</figcaption></figure>"
  },
  {
   "id": "gbm-05",
@@ -1715,38 +1727,39 @@
   "difficulty": "Hard",
   "title": "num_leaves vs max_depth in LightGBM",
   "prompt": "Moving an XGBoost model with max_depth = 8 to LightGBM, the AI suggests settings to get \"the same complexity.\"",
-  "ai": "LightGBM grows leaf-wise, so set **num_leaves = 2^8 = 256** with max_depth = −1. A depth-8 tree has 256 leaves, so that's exactly the same complexity as the XGBoost depth-8 trees.",
+  "ai": "LightGBM grows leaf-wise, so set **num_leaves** $= 2^8 = 256$ with max_depth = −1. A depth-8 tree has 256 leaves, so that's exactly the same complexity as the XGBoost depth-8 trees.",
   "verdict": "wrong",
   "bug": "Leaf-wise trees with 2^depth leaves are much deeper/more complex",
-  "fix": "num_leaves ≪ 2^max_depth (e.g. ~100), plus max_depth and min_data_in_leaf as guards; tune num_leaves with early stopping.",
+  "fix": "`num_leaves` $\\ll 2^{\\text{max\\_depth}}$ (e.g. ~100), plus max_depth and min_data_in_leaf as guards; tune num_leaves with early stopping.",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
   "model": "A leaf budget isn't a depth budget. A greedy grower spends all its leaves digging one deep hole.",
   "mech": "Leaf-wise growth keeps splitting the most promising leaf, so 256 leaves can form a very deep, lopsided tree.",
-  "breaks": "That's powerful on big data and overfits on small data. Keep num_leaves well under 2^depth.",
+  "breaks": "That's powerful on big data and overfits on small data. Keep num_leaves well under $2^{\\text{depth}}$.",
   "contrast": "A depth-wise tree of depth 8 rarely uses all 256 leaves anyway.",
-  "details": "LightGBM's tuning docs warn that setting num_leaves = 2^max_depth can overfit. A leaf-wise tree keeps splitting whichever leaf has the largest loss reduction, so 256 leaves can form a much deeper, lopsided tree than a balanced depth-8 tree. In practice depth-wise trees rarely use all 2^d leaves either. Keep num_leaves well below 2^max_depth (e.g. 70–150 for depth ≈ 8), and set max_depth too and/or min_data_in_leaf.",
-  "why": "Leaf-wise trees with 2^depth leaves are much deeper/more complex"
+  "details": "LightGBM's tuning docs warn that setting $\\text{num\\_leaves} = 2^{\\text{max\\_depth}}$ can overfit. A leaf-wise tree keeps splitting whichever leaf has the largest loss reduction, so 256 leaves can form a much deeper, lopsided tree than a balanced depth-8 tree. In practice depth-wise trees rarely use all $2^d$ leaves either. Keep num_leaves well below $2^{\\text{max\\_depth}}$ (e.g. 70–150 for depth ≈ 8), and set max_depth too and/or min_data_in_leaf.",
+  "why": "Leaf-wise trees with 2^depth leaves are much deeper/more complex",
+  "evis": "| | Depth-wise (XGBoost) | Leaf-wise (LightGBM) |\n|---|---|---|\n| Grows | every node at a level | the single best leaf |\n| Depth 8 | at most 256 leaves, balanced | 256 leaves can be very deep |\n| Risk | underuses leaves | overfits small data |\n| Safer setting | `max_depth = 8` | `num_leaves` ≈ 70 to 150, plus `max_depth` |"
  },
  {
   "id": "gbm-06",
   "sub": "Regularization",
   "difficulty": "Hard",
   "title": "What lambda does to a leaf",
-  "prompt": "A leaf contains rows with gradient sum G = −10 and Hessian sum H = 5. What's the XGBoost optimal leaf weight with reg_lambda = 0 vs reg_lambda = 5?",
-  "ai": "The optimal weight is w* = −G / (H + λ). With λ = 0, w* = 10/5 = **2.0**. With λ = 5, w* = 10/10 = **1.0**. So L2 regularization shrinks leaf values toward 0, more strongly for leaves with a small Hessian sum (few or confident rows).",
+  "prompt": "A leaf contains rows with gradient sum $G = -10$ and Hessian sum $H = 5$. What's the XGBoost optimal leaf weight with reg_lambda = 0 vs reg_lambda = 5?",
+  "ai": "$$w^* = \\frac{-G}{H + \\lambda}$$ With $\\lambda = 0$: $w^* = 10/5 =$ **2.0**. With $\\lambda = 5$: $w^* = 10/10 =$ **1.0**. So L2 regularization shrinks leaf values toward 0, more strongly for leaves with a small Hessian sum (few or confident rows).",
   "verdict": "correct",
-  "fix": "w* = −G/(H+λ): 2.0 → 1.0",
+  "fix": "$w^* = -G/(H+\\lambda)$: 2.0 → 1.0",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
   "bug": "",
   "model": "L2 on leaves is a skeptic: 'show me more evidence before you shout.'",
-  "mech": "Each leaf's value is its push divided by (evidence + λ). Adding λ shrinks leaves with little evidence the most.",
-  "breaks": "It tames leaves built on few or confident rows. Too much λ underfits.",
+  "mech": "Each leaf's value is its push divided by (evidence + $\\lambda$). Adding $\\lambda$ shrinks leaves with little evidence the most.",
+  "breaks": "It tames leaves built on few or confident rows. Too much $\\lambda$ underfits.",
   "contrast": "L1 (alpha) can zero out weak leaves entirely.",
-  "details": "That's correct (Chen & Guestrin 2016, eq. 5). λ also appears in the split gain G²/(H+λ), so it makes splits on small or low-Hessian nodes less attractive. reg_alpha (L1) soft-thresholds G and can set leaf weights exactly to 0.",
+  "details": "That's correct (Chen & Guestrin 2016, eq. 5). $\\lambda$ also appears in the split gain $G^2/(H+\\lambda)$, so it makes splits on small or low-Hessian nodes less attractive. reg_alpha (L1) soft-thresholds G and can set leaf weights exactly to 0.",
   "why": "Each leaf's value is its push divided by (evidence + λ)."
  },
  {
@@ -1758,7 +1771,7 @@
   "ai": "min_child_weight is the minimum **number of rows** in a child. With 10, every leaf must have at least 10 training examples, the same as sklearn's min_samples_leaf.",
   "verdict": "wrong",
   "bug": "It's a minimum Hessian sum, not a row count",
-  "fix": "min_child_weight bounds Σ hessian in a child; for logloss Σ p(1−p). Equivalent to a row count only for squared error (h = 1).",
+  "fix": "min_child_weight bounds $\\sum h$ (Hessian) in a child; for log loss that's $\\sum p(1-p)$. Equivalent to a row count only for squared error ($h = 1$).",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
@@ -1766,7 +1779,7 @@
   "mech": "XGBoost requires a minimum amount of 'curvature' (Hessian) in each child. For log loss, confident rows carry almost none.",
   "breaks": "So on imbalanced data a leaf of thousands of easy negatives may still be 'too light' to split. Only for squared error does it equal a row count.",
   "contrast": "sklearn's min_samples_leaf really is a row count.",
-  "details": "XGBoost's docs define it as the minimum sum of instance weight (Hessian) needed in a child. For squared error h = 1, so it does equal a row count. For log loss h = p(1−p), which is tiny for rows the model is already confident about. A leaf of 1,000 confidently predicted negatives (p ≈ 0.01, h ≈ 0.0099) has Σh ≈ 9.9 and would fail a threshold of 10. On imbalanced data this setting can block splits you might expect, and its effect changes as training goes on.",
+  "details": "XGBoost's docs define it as the minimum sum of instance weight (Hessian) needed in a child. For squared error $h = 1$, so it does equal a row count. For log loss $h = p(1-p)$, which is tiny for rows the model is already confident about. A leaf of 1,000 confidently predicted negatives ($p \\approx 0.01$, $h \\approx 0.0099$) has $\\sum h \\approx 9.9$ and would fail a threshold of 10. On imbalanced data this setting can block splits you might expect, and its effect changes as training goes on.",
   "why": "It's a minimum Hessian sum, not a row count"
  },
  {
@@ -1835,7 +1848,7 @@
   "difficulty": "Medium",
   "title": "Refit after early stopping",
   "prompt": "You used 5-fold CV with early stopping, and the best iterations averaged 800. How should you train the final model on all the data?",
-  "ai": "Refit on 100% of the training data with a fixed n_estimators of about 800, maybe slightly more (e.g. ~800 × 1/(1 − 1/5) ≈ 1000) since there's 25% more data per fit. You can't early-stop the final fit because there's no held-out data left, so fix the round count using CV.",
+  "ai": "Refit on 100% of the training data with a fixed n_estimators of about 800, maybe slightly more (e.g. $800 \\times \\tfrac{1}{1 - 1/5} \\approx 1000$) since there's 25% more data per fit. You can't early-stop the final fit because there's no held-out data left, so fix the round count using CV.",
   "verdict": "correct",
   "fix": "—",
   "topic": "GBM deep dive",
@@ -1878,7 +1891,7 @@
   "ai": "GOSS keeps the rows with large gradients and **drops** the small-gradient rows, since they're already well fit. Training on only the hard examples is faster, and the information gain estimate stays unbiased because small-gradient rows add nothing to it.",
   "verdict": "wrong",
   "bug": "Omits random sampling + re-weighting of small-gradient rows",
-  "fix": "Keep top-a% |g| rows, randomly sample b% of the remainder, up-weight those by (1−a)/b in the gain computation.",
+  "fix": "Keep top-a% |g| rows, randomly sample b% of the remainder, up-weight those by $(1-a)/b$ in the gain computation.",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
@@ -1886,7 +1899,7 @@
   "mech": "GOSS keeps all the large-gradient (poorly fit) rows and a random sample of the rest, then up-weights that sample.",
   "breaks": "Without the reweighting, the data looks harder than it is and splits are biased.",
   "contrast": "Plain row subsampling picks rows uniformly at random.",
-  "details": "GOSS keeps the top a×100% of rows by |gradient| and **randomly samples** b×100% of the rest. It then multiplies the sampled small-gradient rows by (1−a)/b when computing gain. Without that reweighting the data distribution shifts and the gain estimate is biased. With it, Ke et al. (2017) show the estimate stays accurate.",
+  "details": "GOSS keeps the top a×100% of rows by |gradient| and **randomly samples** b×100% of the rest. It then multiplies the sampled small-gradient rows by $(1-a)/b$ when computing gain. Without that reweighting the data distribution shifts and the gain estimate is biased. With it, Ke et al. (2017) show the estimate stays accurate.",
   "why": "Omits random sampling + re-weighting of small-gradient rows"
  },
  {
@@ -2147,7 +2160,8 @@
   "breaks": "Model the trend separately (differences, ratios) and let the GBM learn what's left.",
   "contrast": "Linear models extrapolate, sometimes too eagerly.",
   "details": "Tree predictions are piecewise constant. For any month_index beyond the last split, the prediction stays at the value of the last leaf, about 340. GBMs flatten out instead of extrapolating. Detrend first (model differences or ratios), use a linear base learner or linear_tree, or a model built for forecasting.",
-  "why": "Tree ensembles can't extrapolate beyond the training range"
+  "why": "Tree ensembles can't extrapolate beyond the training range",
+  "vis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Training data: linear growth 100 to 340 over 24 months\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">month</text><text class=\"tx\" x=\"34\" y=\"14\">credits</text><path class=\"ln\" d=\"M30.0,132.5 L39.8,128.3 L49.7,124.2 L59.5,120.0 L69.3,115.8 L79.2,111.7 L89.0,107.5 L98.8,103.3 L108.7,99.2 L118.5,95.0 L128.3,90.8 L138.2,86.7 L148.0,82.5 L157.8,78.3 L167.7,74.2 L177.5,70.0 L187.3,65.8 L197.2,61.7 L207.0,57.5 L216.8,53.3 L226.7,49.2 L236.5,45.0 L246.3,40.8 L256.2,36.7 L266.0,32.5\"/><circle class=\"dot\" cx=\"325\" cy=\"7.5\" r=\"4\"/><text class=\"tx\" x=\"319\" y=\"24.0\" text-anchor=\"end\">month 30?</text></svg><figcaption>Training data: linear growth 100 to 340 over 24 months</figcaption></figure>"
  },
  {
   "id": "gbm-27",
@@ -2167,18 +2181,19 @@
   "breaks": "That's why boosting needs early stopping. Random-forest trees don't chase each other, so adding more is safe.",
   "contrast": "With a tiny learning rate it takes longer to overfit, but it still does.",
   "details": "",
-  "why": "Each new runner fixes what's left."
+  "why": "Each new runner fixes what's left.",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Training error keeps falling; test error bottoms out, then rises\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">boosting rounds</text><text class=\"tx\" x=\"34\" y=\"14\">error</text><path class=\"ln mut\" d=\"M30.0,35.0 L34.9,41.9 L39.8,48.3 L44.8,54.3 L49.7,59.9 L54.6,65.1 L59.5,70.0 L64.4,74.6 L69.3,78.9 L74.2,82.9 L79.2,86.7 L84.1,90.2 L89.0,93.5 L93.9,96.6 L98.8,99.5 L103.8,102.2 L108.7,104.7 L113.6,107.0 L118.5,109.2 L123.4,111.3 L128.3,113.2 L133.2,115.0 L138.2,116.7 L143.1,118.3 L148.0,119.8 L152.9,121.2 L157.8,122.5 L162.8,123.7 L167.7,124.8 L172.6,125.9 L177.5,126.9 L182.4,127.8 L187.3,128.7 L192.2,129.5 L197.2,130.2 L202.1,130.9 L207.0,131.6 L211.9,132.2 L216.8,132.8 L221.8,133.4 L226.7,133.9 L231.6,134.3 L236.5,134.8 L241.4,135.2 L246.3,135.6 L251.2,136.0 L256.2,136.3 L261.1,136.6 L266.0,136.9 L270.9,137.2 L275.8,137.5 L280.8,137.7 L285.7,137.9 L290.6,138.1 L295.5,138.3 L300.4,138.5 L305.3,138.7 L310.2,138.9 L315.2,139.0 L320.1,139.2 L325.0,139.3\"/><path class=\"ln\" d=\"M30.0,26.2 L34.9,32.2 L39.8,37.5 L44.8,42.3 L49.7,46.7 L54.6,50.5 L59.5,54.0 L64.4,57.1 L69.3,59.9 L74.2,62.4 L79.2,64.5 L84.1,66.5 L89.0,68.2 L93.9,69.7 L98.8,71.0 L103.8,72.1 L108.7,73.0 L113.6,73.8 L118.5,74.5 L123.4,75.0 L128.3,75.4 L133.2,75.7 L138.2,75.9 L143.1,76.1 L148.0,76.1 L152.9,76.0 L157.8,75.9 L162.8,75.7 L167.7,75.4 L172.6,75.1 L177.5,74.7 L182.4,74.3 L187.3,73.8 L192.2,73.2 L197.2,72.6 L202.1,72.0 L207.0,71.3 L211.9,70.6 L216.8,69.8 L221.8,69.0 L226.7,68.2 L231.6,67.3 L236.5,66.4 L241.4,65.4 L246.3,64.5 L251.2,63.4 L256.2,62.4 L261.1,61.3 L266.0,60.2 L270.9,59.1 L275.8,57.9 L280.8,56.8 L285.7,55.5 L290.6,54.3 L295.5,53.0 L300.4,51.7 L305.3,50.4 L310.2,49.1 L315.2,47.7 L320.1,46.3 L325.0,44.8\"/><circle class=\"dot\" cx=\"124.4\" cy=\"75.10706486685311\" r=\"4\"/><text class=\"tx\" x=\"323\" y=\"133.303963368072\" text-anchor=\"end\">train</text><text class=\"tx g\" x=\"323\" y=\"39.75\" text-anchor=\"end\">test</text><text class=\"tx\" x=\"124.4\" y=\"93.10706486685311\" text-anchor=\"middle\">early stop</text></svg><figcaption>Training error keeps falling; test error bottoms out, then rises</figcaption></figure>"
  },
  {
   "id": "gbm-28",
   "sub": "Loss & gradients",
   "difficulty": "Medium",
   "title": "Residuals for every loss?",
-  "prompt": "\"In gradient boosting, every tree is fit to the raw residuals y − prediction, whatever the loss.\" The AI agrees:",
-  "ai": "Yes. That's what 'gradient' boosting means. Every tree fits y − F, whether the loss is squared error, absolute error, or log loss.",
+  "prompt": "\"In gradient boosting, every tree is fit to the raw residuals $y - \\text{prediction}$, whatever the loss.\" The AI agrees:",
+  "ai": "Yes. That's what 'gradient' boosting means. Every tree fits $y - F$, whether the loss is squared error, absolute error, or log loss.",
   "verdict": "wrong",
   "bug": "Raw residuals only for squared error",
-  "fix": "Each tree fits the negative gradient of the chosen loss: y − F for squared error, sign(y − F) for absolute error, y − p for log loss (XGBoost also uses the Hessian).",
+  "fix": "Each tree fits the negative gradient of the chosen loss: $y - F$ for squared error, $\\operatorname{sign}(y - F)$ for absolute error, $y - p$ for log loss (XGBoost also uses the Hessian).",
   "topic": "GBM deep dive",
   "track": "gbm",
   "lang": "text",
@@ -2298,7 +2313,7 @@
   "ai": "It's the **ATE**, the average effect of CodePilot across all 9,000 accounts, because matching makes the groups comparable.",
   "verdict": "wrong",
   "bug": "Matching controls to treated units targets the ATT",
-  "fix": "ATT = E[Y(1) − Y(0) | D = 1]. ATE requires matching in both directions (Matching::Match estimand='ATE').",
+  "fix": "$\\text{ATT} = E[\\,Y(1) - Y(0) \\mid D = 1\\,]$. ATE requires matching in both directions (Matching::Match estimand='ATE').",
   "topic": "Causal inference",
   "track": "causal",
   "lang": "text",
@@ -2306,7 +2321,7 @@
   "mech": "Matching finds a twin for each adopter, so you learn what adoption did for adopters (ATT).",
   "breaks": "The ATE would also need twins for non-adopters, who may be very different (small accounts).",
   "contrast": "Matching in both directions targets the ATE.",
-  "details": "Finding a control for every treated unit estimates the **ATT**, E[Y(1) − Y(0) | adopted], the effect on the kind of accounts that adopted. The ATE would also need to impute Y(1) for the non-adopters, which can be very different (e.g. small accounts). For a decision like whether CodePilot paid off for adopters, the ATT is usually the right target. For whether to push it to everyone, you'd want the ATE or ATC.",
+  "details": "Finding a control for every treated unit estimates the **ATT**, $E[\\,Y(1) - Y(0) \\mid \\text{adopted}\\,]$, the effect on the kind of accounts that adopted. The ATE would also need to impute $Y(1)$ for the non-adopters, which can be very different (e.g. small accounts). For a decision like whether CodePilot paid off for adopters, the ATT is usually the right target. For whether to push it to everyone, you'd want the ATE or ATC.",
   "why": "Matching controls to treated units targets the ATT"
  },
  {
@@ -2315,7 +2330,7 @@
   "difficulty": "Medium",
   "title": "Decomposing the naive difference",
   "prompt": "**Scenario:** Nimbus Cloud (fictional) launched *CodePilot*, an AI coding assistant. About 1,200 of 9,000 customer accounts adopted it in Q2. You want to know whether adoption changes monthly compute credits. Write the naive adopter-vs-non-adopter difference in mean credits in potential-outcomes terms.",
-  "ai": "E[Y|D=1] − E[Y|D=0] = **ATT** + **{E[Y(0)|D=1] − E[Y(0)|D=0]}**. The second term is selection bias: how different adopters' credits would have been from non-adopters' even without CodePilot. It's 0 only if treatment is as good as random with respect to Y(0).",
+  "ai": "$$\\underbrace{E[Y \\mid D{=}1] - E[Y \\mid D{=}0]}_{\\text{naive gap}} = \\text{ATT} + \\underbrace{E[Y(0) \\mid D{=}1] - E[Y(0) \\mid D{=}0]}_{\\text{selection bias}}$$ The second term is selection bias: how different adopters' credits would have been from non-adopters' even without CodePilot. It's 0 only if treatment is as good as random with respect to $Y(0)$.",
   "verdict": "correct",
   "fix": "naive = ATT + selection bias",
   "topic": "Causal inference",
@@ -2346,8 +2361,9 @@
   "mech": "The +1,300 mixes the effect with the fact that adopters were already heavy users.",
   "breaks": "Same calendar window ≠ same kind of account. Compare against look-alikes.",
   "contrast": "Matched controls with similar pre-period usage would shrink the gap toward the true effect.",
-  "details": "Large engineering-heavy accounts would have used more credits without CodePilot. That's the selection-bias term E[Y(0)|D=1] − E[Y(0)|D=0]. Having the same calendar window removes common shocks but not differences in composition. You need to adjust for pre-adoption size and usage (matching on lagged credits, DiD, etc.).",
-  "why": "Naive comparison = effect + selection bias"
+  "details": "Large engineering-heavy accounts would have used more credits without CodePilot. That's the selection-bias term $E[Y(0) \\mid D{=}1] - E[Y(0) \\mid D{=}0]$. Having the same calendar window removes common shocks but not differences in composition. You need to adjust for pre-adoption size and usage (matching on lagged credits, DiD, etc.).",
+  "why": "Naive comparison = effect + selection bias",
+  "vis": "<figure class=\"vis\"><pre class=\"mermaid\">flowchart TD\n  S[Account size and engineering headcount] --> D[Adopts CodePilot]\n  S --> Y[Monthly credits]\n  D -. effect? .-> Y</pre><figcaption>Size drives both adoption and credits, a backdoor path.</figcaption></figure>"
  },
  {
   "id": "ci-04",
@@ -2415,7 +2431,7 @@
   "difficulty": "Easy",
   "title": "Standardized mean difference",
   "prompt": "**Scenario:** Nimbus Cloud (fictional) launched *CodePilot*, an AI coding assistant. About 1,200 of 9,000 customer accounts adopted it in Q2. You want to know whether adoption changes monthly compute credits. After matching, mean pre-period credits are 1,050 (adopters) vs 1,000 (controls). SDs are 400 and 380. What's the SMD, and is that acceptable?",
-  "ai": "SMD = (1050 − 1000) / √((400² + 380²)/2) = 50/390.1 ≈ **0.128**. That's above the common 0.1 rule of thumb, so lagged credits aren't quite balanced yet. Refine the matching (calipers, more weight on that covariate) before estimating.",
+  "ai": "$$\\text{SMD} = \\frac{1050 - 1000}{\\sqrt{(400^2 + 380^2)/2}} = \\frac{50}{390.1} \\approx 0.128$$ That's above the common 0.1 rule of thumb, so lagged credits aren't quite balanced yet. Refine the matching (calipers, more weight on that covariate) before estimating.",
   "verdict": "correct",
   "fix": "SMD ≈ 0.128",
   "topic": "Causal inference",
@@ -2467,7 +2483,8 @@
   "breaks": "If the outcome reacts nonlinearly, that bias matters. Check variance ratios and KS too.",
   "contrast": "With variance ratio ≈ 1 and a small KS, the distributions are similar.",
   "details": "Equal means can hide very different distributions. Here the variance ratio is far from 1 and the KS statistic would be large. If credits affect the outcome non-linearly (e.g. big accounts grow differently), the estimate is biased. That's why GenMatch checks KS tests as well as mean tests.",
-  "why": "Mean balance ≠ distributional balance"
+  "why": "Mean balance ≠ distributional balance",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Same mean (SMD = 0), completely different shapes\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">lagged credits</text><text class=\"tx\" x=\"34\" y=\"14\"></text><path class=\"ln\" d=\"M30.0,145.0 L34.9,145.0 L39.8,145.0 L44.8,145.0 L49.7,145.0 L54.6,145.0 L59.5,145.0 L64.4,145.0 L69.3,145.0 L74.2,145.0 L79.2,145.0 L84.1,145.0 L89.0,145.0 L93.9,145.0 L98.8,144.9 L103.8,144.8 L108.7,144.6 L113.6,144.1 L118.5,143.1 L123.4,141.4 L128.3,138.4 L133.2,133.7 L138.2,126.7 L143.1,116.9 L148.0,104.4 L152.9,89.6 L157.8,73.5 L162.8,57.8 L167.7,44.6 L172.6,35.6 L177.5,32.5 L182.4,35.6 L187.3,44.6 L192.2,57.8 L197.2,73.5 L202.1,89.6 L207.0,104.4 L211.9,116.9 L216.8,126.7 L221.8,133.7 L226.7,138.4 L231.6,141.4 L236.5,143.1 L241.4,144.1 L246.3,144.6 L251.2,144.8 L256.2,144.9 L261.1,145.0 L266.0,145.0 L270.9,145.0 L275.8,145.0 L280.8,145.0 L285.7,145.0 L290.6,145.0 L295.5,145.0 L300.4,145.0 L305.3,145.0 L310.2,145.0 L315.2,145.0 L320.1,145.0 L325.0,145.0\"/><path class=\"ln mut\" d=\"M30.0,138.1 L34.9,133.8 L39.8,127.9 L44.8,120.2 L49.7,111.2 L54.6,101.3 L59.5,91.7 L64.4,83.6 L69.3,78.2 L74.2,76.2 L79.2,78.2 L84.1,83.6 L89.0,91.7 L93.9,101.3 L98.8,111.2 L103.8,120.2 L108.7,127.9 L113.6,133.8 L118.5,138.1 L123.4,141.0 L128.3,142.8 L133.2,143.8 L138.2,144.4 L143.1,144.7 L148.0,144.9 L152.9,145.0 L157.8,145.0 L162.8,145.0 L167.7,145.0 L172.6,145.0 L177.5,145.0 L182.4,145.0 L187.3,145.0 L192.2,145.0 L197.2,145.0 L202.1,145.0 L207.0,144.9 L211.9,144.7 L216.8,144.4 L221.8,143.8 L226.7,142.8 L231.6,141.0 L236.5,138.1 L241.4,133.8 L246.3,127.9 L251.2,120.2 L256.2,111.2 L261.1,101.3 L266.0,91.7 L270.9,83.6 L275.8,78.2 L280.8,76.2 L285.7,78.2 L290.6,83.6 L295.5,91.7 L300.4,101.3 L305.3,111.2 L310.2,120.2 L315.2,127.9 L320.1,133.8 L325.0,138.1\"/><text class=\"tx g\" x=\"177.5\" y=\"26.5\" text-anchor=\"middle\">adopters</text><text class=\"tx\" x=\"74.25\" y=\"70.25\" text-anchor=\"middle\">controls</text><text class=\"tx\" x=\"280.75\" y=\"70.25\" text-anchor=\"middle\">controls</text></svg><figcaption>Same mean (SMD = 0), completely different shapes</figcaption></figure>"
  },
  {
   "id": "ci-10",
@@ -2507,7 +2524,8 @@
   "breaks": "Breaks if something new happens right at adoption, like a hiring push.",
   "contrast": "Matching only on firmographics misses these dynamics.",
   "details": "That's correct. Lagged outcomes are often the strongest confounder proxies. It's the same idea behind synthetic control and the case for conditioning on pre-trends. They don't fix confounders that only show up at adoption time (e.g. a new hiring push).",
-  "why": "Pre-period trajectories summarize hard-to-measure drivers (workload, growth), so matching on them finds real look-alikes."
+  "why": "Pre-period trajectories summarize hard-to-measure drivers (workload, growth), so matching on them finds real look-alikes.",
+  "evis": "<figure class=\"vis\"><pre class=\"mermaid\">flowchart TD\n  U[Hidden factors: workload, team size, growth] --> L[Credits in the 6 months before]\n  U --> D[Adopts CodePilot]\n  U --> Y[Credits after]\n  D --> Y</pre><figcaption>Lagged credits act as a proxy for the hidden factors</figcaption></figure>"
  },
  {
   "id": "ci-12",
@@ -2537,7 +2555,7 @@
   "prompt": "**Scenario:** Nimbus Cloud (fictional) launched *CodePilot*, an AI coding assistant. About 1,200 of 9,000 customer accounts adopted it in Q2. You want to know whether adoption changes monthly compute credits. Each account's monthly credits = stable account level + independent monthly noise (equal variances). Accounts are chosen because last month was in the top 10%. Nobody gets any treatment. What happens next month?",
   "ai": "On average, next month's credits come back down toward the mean. They stay above the overall average (since the stable level is higher too), but noticeably below the selection month. With equal variances, roughly half of the selection-month excess disappears.",
   "verdict": "correct",
-  "fix": "E[next − mean | selected] ≈ 0.5 × (selection month − mean)",
+  "fix": "$E[\\text{next} - \\text{mean} \\mid \\text{selected}] \\approx 0.5 \\times (\\text{selection month} - \\text{mean})$",
   "topic": "Causal inference",
   "track": "causal",
   "lang": "text",
@@ -2547,7 +2565,8 @@
   "breaks": "The more reliable the measure, the less it reverts.",
   "contrast": "Selecting on a long-run average reverts much less.",
   "details": "That's correct. The expected next value is shrunk by the reliability, var(level)/var(total) = 0.5. A simulation shows about half of the excess goes away.",
-  "why": "Selecting on a high month picks accounts with high luck, which reverts."
+  "why": "Selecting on a high month picks accounts with high luck, which reverts.",
+  "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Selected on a spike, the next month falls about halfway back\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">month</text><text class=\"tx\" x=\"34\" y=\"14\">credits</text><path class=\"ax2\" d=\"M30,95.0 L330,95.0\"/><text class=\"tx\" x=\"326\" y=\"91.0\" text-anchor=\"end\">overall mean</text><path class=\"ln\" d=\"M74.2,88.8 L148.0,85.0 L221.8,26.2 L295.5,60.0\"/><circle class=\"dot\" cx=\"221.75\" cy=\"26.25\" r=\"4\"/><circle class=\"dot\" cx=\"295.5\" cy=\"60.0\" r=\"4\"/><text class=\"tx\" x=\"221.75\" y=\"18.25\" text-anchor=\"middle\">selected spike</text><text class=\"tx\" x=\"295.5\" y=\"80.0\" text-anchor=\"middle\">next month</text></svg><figcaption>Selected on a spike, the next month falls about halfway back</figcaption></figure>"
  },
  {
   "id": "ci-14",
@@ -2555,7 +2574,7 @@
   "difficulty": "Easy",
   "title": "DiD arithmetic",
   "prompt": "**Scenario:** Nimbus Cloud (fictional) launched *CodePilot*, an AI coding assistant. About 1,200 of 9,000 customer accounts adopted it in Q2. You want to know whether adoption changes monthly compute credits. Matched adopters: 1,000 → 1,300 credits (pre → post). Matched controls: 980 → 1,180. What's the DiD estimate?",
-  "ai": "(1,300 − 1,000) − (1,180 − 980) = 300 − 200 = **+100 credits/month**, assuming parallel trends.",
+  "ai": "$$(1300 - 1000) - (1180 - 980) = 300 - 200 = +100$$ **+100 credits/month**, assuming parallel trends.",
   "verdict": "correct",
   "fix": "+100",
   "topic": "Causal inference",
@@ -2567,7 +2586,8 @@
   "breaks": "Relies on parallel trends.",
   "contrast": "If the controls didn't change at all, DiD equals the simple before/after.",
   "details": "That's correct. DiD subtracts the control group's change to remove common time shocks and fixed level differences.",
-  "why": "Adopters' change minus the controls' change leaves the effect."
+  "why": "Adopters' change minus the controls' change leaves the effect.",
+  "vis": "| Group | Pre | Post | Change |\n|---|---:|---:|---:|\n| Matched adopters | 1,000 | 1,300 | +300 |\n| Matched controls | 980 | 1,180 | +200 |"
  },
  {
   "id": "ci-15",
@@ -2607,7 +2627,8 @@
   "breaks": "The estimate can even flip sign. Use modern staggered estimators.",
   "contrast": "With one adoption date and constant effects, TWFE is fine.",
   "details": "With staggered timing and effects that vary or grow over time, the TWFE coefficient is a weighted average of all 2×2 DiDs, including comparisons that use **already-treated** accounts as controls. Some weights can be negative, so the estimate can even have the wrong sign (Goodman-Bacon 2021, de Chaisemartin & D'Haultfœuille 2020).",
-  "why": "TWFE uses already-treated units as controls; negative weights"
+  "why": "TWFE uses already-treated units as controls; negative weights",
+  "evis": "| 2×2 comparison | Control group used | Weight can be |\n|---|---|---|\n| Early vs never adopters | never treated | positive |\n| Late vs never adopters | never treated | positive |\n| Late vs early (already treated) | **already treated** | **negative** |"
  },
  {
   "id": "ci-17",
@@ -2667,7 +2688,8 @@
   "breaks": "Only match on things fixed before adoption.",
   "contrast": "Pre-period query volume is a good covariate.",
   "details": "Post-period queries are likely **caused by** CodePilot (more generated code → more queries → more credits). Matching on it blocks the mediating path and can open collider paths, which biases the total effect, typically toward 0. Only pre-treatment covariates belong in the matching set.",
-  "why": "Conditioning on a mediator (post-treatment variable)"
+  "why": "Conditioning on a mediator (post-treatment variable)",
+  "vis": "<figure class=\"vis\"><pre class=\"mermaid\">flowchart TD\n  X[Pre-period covariates] --> D[Adopts CodePilot]\n  X --> Y[Credits]\n  D --> Q[Post-period queries]\n  Q --> Y\n  D -. direct .-> Y</pre><figcaption>Post-period queries sit downstream of adoption.</figcaption></figure>"
  },
  {
   "id": "ci-20",
@@ -2706,7 +2728,7 @@
   "mech": "Γ = 2 means: even if hidden factors doubled adoption odds within pairs, the conclusion holds.",
   "breaks": "It's about robustness, not effect size.",
   "contrast": "Γ = 1 means no hidden bias.",
-  "details": "Γ bounds how much an unobserved confounder could change the odds of treatment between two matched units that look the same on X. Γ = 2 means the conclusion holds even if hidden bias made one unit in a pair up to 2× as likely to adopt. Larger Γ = more robust conclusion. It says nothing about the size of the effect.",
+  "details": "$\\Gamma$ bounds how much an unobserved confounder could change the odds of treatment between two matched units that look the same on X. $\\Gamma = 2$ means the conclusion holds even if hidden bias made one unit in a pair up to 2× as likely to adopt. Larger $\\Gamma$ = more robust conclusion. It says nothing about the size of the effect.",
   "why": "Γ is about hidden-bias odds, not effect size"
  },
  {
@@ -2715,7 +2737,7 @@
   "difficulty": "Hard",
   "title": "E-value",
   "prompt": "**Scenario:** Nimbus Cloud (fictional) launched *CodePilot*, an AI coding assistant. About 1,200 of 9,000 customer accounts adopted it in Q2. You want to know whether adoption changes monthly compute credits. The matched analysis finds adopters are 1.5× as likely (risk ratio) to move to a higher credit tier. What's the E-value for the point estimate?",
-  "ai": "E = RR + √(RR(RR−1)) = 1.5 + √0.75 ≈ **2.37**. An unmeasured confounder would need a risk-ratio association of at least 2.37 with **both** adoption and tier upgrade (beyond the measured covariates) to fully explain away the effect.",
+  "ai": "$$E = RR + \\sqrt{RR\\,(RR - 1)} = 1.5 + \\sqrt{0.75} \\approx 2.37$$ An unmeasured confounder would need a risk-ratio association of at least 2.37 with **both** adoption and tier upgrade (beyond the measured covariates) to fully explain away the effect.",
   "verdict": "correct",
   "fix": "≈ 2.37",
   "topic": "Causal inference",
