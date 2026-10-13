@@ -41,10 +41,10 @@
   "details": "COUNT(*) counts login events, not users. User 1 logs in twice on May 1 and user 2 twice on May 2, so the AI returns 4 and 3 instead of 3 and 2.",
   "why": "COUNT(*) vs COUNT(DISTINCT)",
   "flaws": [
-   "COUNT(*) vs COUNT(DISTINCT)",
-   "Should GROUP BY login_ts instead of the date",
-   "CAST to DATE drops timezone info",
-   "ORDER BY 1 sorts by the count"
+   "COUNT(*) counts logins, not distinct users",
+   "GROUP BY 1 groups on the raw login timestamp",
+   "ORDER BY 1 sorts by DAU instead of by the day",
+   "CAST(login_ts AS DATE) fails on TIMESTAMPs"
   ]
  },
  {
@@ -68,10 +68,10 @@
   "details": "The filter on the right table sits in WHERE, so rows where `o.order_date` is NULL (no match) or from 2025 are removed after the join. Dee (only a 2025 order) disappears instead of showing 0. Move the date condition into the ON clause.",
   "why": "WHERE filter turns LEFT JOIN into INNER JOIN",
   "flaws": [
-   "WHERE filter turns LEFT JOIN into INNER JOIN",
-   "LEFT JOIN should be a RIGHT JOIN",
-   "COUNT(*) counts NULLs as zero",
-   "GROUP BY must include the order date"
+   "WHERE on o.order_date turns the LEFT JOIN inner",
+   "COUNT(o.order_id) gives NULL, not 0, on no match",
+   "GROUP BY needs o.order_date for the date filter",
+   "Pre-2026 orders still leak in through the join"
   ]
  },
  {
@@ -137,10 +137,10 @@
   "details": "ROW_NUMBER gives tied salaries different numbers, so it returns exactly 3 rows per department. In eng the top 3 *distinct* salaries are 200, 180, 150 → emp 1,2,3,4 should all appear; the AI drops emp 4 (150). DENSE_RANK assigns tied values the same rank without gaps.",
   "why": "ROW_NUMBER instead of DENSE_RANK",
   "flaws": [
-   "ROW_NUMBER instead of DENSE_RANK",
-   "RANK skips ranks after ties",
-   "Should use NTILE(3)",
-   "ORDER BY salary ASC in the window"
+   "ROW_NUMBER breaks ties; needs DENSE_RANK here",
+   "PARTITION BY dept should also include emp_id",
+   "ORDER BY salary DESC ranks lowest earners first",
+   "Filter rn <= 3 must move into a HAVING clause"
   ]
  },
  {
@@ -185,10 +185,10 @@
   "details": "`7 PRECEDING AND CURRENT ROW` covers 8 rows. A 7-day window including today needs `6 PRECEDING`. The values match for the first 7 days and then diverge.",
   "why": "Off-by-one window frame",
   "flaws": [
-   "Off-by-one window frame",
-   "AVG ignores NULL days",
-   "Window should be RANGE, not ROWS",
-   "Must PARTITION BY date"
+   "ROWS 7 PRECEDING + current row averages 8 days",
+   "ROWS frame must be RANGE for a date-ordered window",
+   "AVG over a window needs a PARTITION BY clause",
+   "First 6 days average fewer rows; should be NULL"
   ]
  },
  {
@@ -233,10 +233,10 @@
   "details": "The subquery contains NULLs. `x NOT IN (1, 3, NULL)` evaluates to UNKNOWN for every x, so the query returns **zero rows** instead of users 2, 4, 5. Use NOT EXISTS, or filter NULLs inside the subquery.",
   "why": "NOT IN with NULLs",
   "flaws": [
-   "NOT IN with NULLs",
-   "NOT EXISTS would return duplicates",
-   "Subquery needs DISTINCT",
-   "Should use LEFT JOIN … IS NOT NULL"
+   "NOT IN returns nothing once a referrer_id is NULL",
+   "Subquery needs DISTINCT or users repeat in output",
+   "Organic users (NULL referrer) get excluded too",
+   "Should compare referrer_id, not user_id, to outer"
   ]
  },
  {
@@ -260,10 +260,10 @@
   "details": "Joining to line items repeats each order_total once per item. Customer 7's revenue becomes 50+50+20=120 (true 70), and customer 8 becomes 300 (true 100). Aggregate items to order grain before joining.",
   "why": "Join fan-out double counts",
   "flaws": [
-   "Join fan-out double counts",
-   "SUM over a LEFT JOIN drops customers",
-   "GROUP BY needs customer name",
-   "Units should be COUNT, not SUM"
+   "Joining items repeats order_total once per item",
+   "SUM(i.qty) needs COUNT(i.qty) to get total units",
+   "GROUP BY must also include i.order_id here",
+   "SUM(o.order_total) should be AVG per customer"
   ]
  },
  {
@@ -308,10 +308,10 @@
   "details": "'2026-01-31' is cast to midnight, so anything later on Jan 31 (the 18:42 payment of 40) is excluded: the AI returns 60 instead of 100. Use a half-open range: `>= '2026-01-01' AND < '2026-02-01'`.",
   "why": "BETWEEN on timestamps drops the last day",
   "flaws": [
-   "BETWEEN on timestamps drops the last day",
-   "BETWEEN excludes the first day",
-   "Timestamps must be cast to strings",
-   "Timezone offset shifts January into February"
+   "'2026-01-31' means midnight, so Jan 31 is lost",
+   "BETWEEN excludes Jan 1 because it's exclusive",
+   "String dates can't be compared to a TIMESTAMP",
+   "SUM returns 0, not NULL, if no January rows"
   ]
  },
  {
@@ -377,10 +377,10 @@
   "details": "The date-minus-row-number trick only works if each date appears once. User 1's duplicate Aug 2 row bumps the row number, so Aug 3 lands in a different group and the streak reads 2 instead of 3. Deduplicate first (SELECT DISTINCT), then number the rows.",
   "why": "Didn't dedupe before ROW_NUMBER",
   "flaws": [
-   "Didn't dedupe before ROW_NUMBER",
-   "LAG should be LEAD",
-   "Streak must be computed with RANK",
-   "Should partition by date, not user"
+   "Duplicate days break ROW_NUMBER; dedupe first",
+   "COUNT(DISTINCT active_date) undercounts streaks",
+   "date minus ROW_NUMBER gives one grp across gaps",
+   "PARTITION BY user_id should be PARTITION BY date"
   ]
  },
  {
@@ -425,10 +425,10 @@
   "details": "The AI counts any purchase, including one that happened **before** the cart event. User 3 bought at 09:00 and added to cart at 12:00, so they shouldn't count. AI: 3/4 = 0.75, correct: 2/4 = 0.50.",
   "why": "Ignores event ordering",
   "flaws": [
-   "Ignores event ordering",
-   "Counts sessions instead of users",
-   "Conversion should divide by purchases",
-   "Funnel steps need a UNION ALL"
+   "Counts any purchase, even before the first cart",
+   "COUNT(c.user_id) counts cart events, not users",
+   "LEFT JOIN should be INNER, or the rate breaks",
+   "ROUND before the division truncates to 0 or 1"
   ]
  },
  {
@@ -452,10 +452,10 @@
   "details": "With ORDER BY, the default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, so LAST_VALUE just returns the current row's status. Extend the frame to UNBOUNDED FOLLOWING, or use FIRST_VALUE with ORDER BY ts DESC.",
   "why": "Default window frame with LAST_VALUE",
   "flaws": [
-   "Default window frame with LAST_VALUE",
-   "LAST_VALUE needs ORDER BY DESC",
-   "Should use FIRST_VALUE with PARTITION BY status",
-   "Window functions can't be used with ORDER BY"
+   "Default frame ends at current row, not last row",
+   "LAST_VALUE needs ORDER BY ts DESC to look ahead",
+   "Should PARTITION BY status rather than user_id",
+   "Outer ORDER BY overrides the window ordering"
   ]
  },
  {
@@ -521,10 +521,10 @@
   "details": "`merge` defaults to `how='inner'`, so users 2 and 4 (no tickets) disappear. Use `how='left'` and fill the missing counts with 0.",
   "why": "Inner merge drops users",
   "flaws": [
-   "Inner merge drops users",
-   "Should use pd.concat instead of merge",
-   "value_counts drops zero counts by default only for categoricals",
-   "groupby needs as_index=False"
+   "Default inner merge drops users with no tickets",
+   "size() counts NaN rows; count() is needed here",
+   "reset_index() loses user_id before the merge",
+   "rename() renames the index, not the Series"
   ]
  },
  {
@@ -569,10 +569,10 @@
   "details": "`rolling(7)` uses the last 7 **rows**, not 7 days. Because Mar 4–5 are missing, the window on Mar 9 reaches back to Mar 2 (8 calendar days). Use a time-based window `rolling('7D')`, or reindex to fill missing days with 0.",
   "why": "Row-based window over gappy dates",
   "flaws": [
-   "Row-based window over gappy dates",
-   "rolling() needs min_periods=7",
-   "Must sort descending first",
-   "Should use expanding() instead"
+   "rolling(7) counts 7 rows, not 7 calendar days",
+   "min_periods=1 leaves the first 6 sums too low",
+   "rolling().sum() includes the next row's orders",
+   "Should use expanding().sum() for a trailing sum"
   ]
  },
  {
@@ -617,10 +617,10 @@
   "details": "Filling NaN with 0 counts non-raters as 0-star votes: M1 becomes 3.0 instead of 4.5. pandas' `mean()` already skips NaN, so just drop the fillna.",
   "why": "Treating missing as zero",
   "flaws": [
-   "Treating missing as zero",
-   "mean() can't handle NaN",
-   "Should use median for ratings",
-   "groupby sorts by movie name"
+   "fillna(0) turns unrated into 0-star ratings",
+   "mean() skips NaN only when skipna=False is set",
+   "groupby drops movies with all ratings missing",
+   "Should be median, since ratings are ordinal"
   ]
  },
  {
@@ -665,10 +665,10 @@
   "details": "`diff()` runs down the whole frame, so each user's first order gets compared with the previous user's last order. For example, user 2's first order shows -9 days instead of NaN. Use `groupby('user_id')['order_date'].diff()`.",
   "why": "diff() without groupby leaks across users",
   "flaws": [
-   "diff() without groupby leaks across users",
-   "diff() returns negative values",
-   "Dates must be strings for diff()",
-   "Should use pct_change()"
+   "diff() runs across users; needs groupby first",
+   "dt.days drops partial days, so gaps run short",
+   "assign() overwrites order_date with the diff",
+   "First order gets 0 instead of NaN from diff()"
   ]
  },
  {
@@ -713,10 +713,10 @@
   "details": "`expanding().mean()` includes the current transaction, so the feature leaks the amount it's meant to score. A \\$100 spike shows a prior average of 50 instead of 25, which makes anomalies look less anomalous in training than they will at serving time. The first row should be NaN, not the amount itself. Shift by one within each user before averaging.",
   "why": "Feature leakage: includes the current row",
   "flaws": [
-   "Feature leakage: includes the current row",
-   "Expanding mean should be rolling(3)",
-   "Shift should be −1",
-   "Should drop NaN before groupby"
+   "expanding().mean() includes the current row",
+   "transform misaligns rows with the original index",
+   "expanding() should be rolling(3) for stability",
+   "groupby leaks other users' amounts into means"
   ]
  },
  {
@@ -759,10 +759,10 @@
   "details": "A p-value is P(data at least this extreme | H0 is true), not P(H0 | data). Turning it into the probability that the null is true needs a prior, which is Bayes, and \"97% confident the effect is real\" is the same mistake.",
   "why": "p-value ≠ P(null is true)",
   "flaws": [
-   "p-value ≠ P(null is true)",
-   "p-value is the probability the result replicates",
-   "p = 0.03 means a 3% effect size",
-   "p-value is the false-positive rate of the test"
+   "A p-value isn't the probability H0 is true",
+   "It's the chance the result fails to replicate",
+   "97% confident should be stated as a 95% CI",
+   "p = 0.03 should be doubled for a two-sided test"
   ]
  },
  {
@@ -806,10 +806,10 @@
   "why": "Base-rate neglect (confuses P(flag|fraud) with P(fraud|flag))",
   "vis": "| Per 10,000 transactions | Flagged | Not flagged |\n|---|---:|---:|\n| Fraud (100) | 95 | 5 |\n| Legit (9,900) | 495 | 9,405 |",
   "flaws": [
-   "Base-rate neglect (confuses P(flag|fraud) with P(fraud|flag))",
-   "Should use the 5% false-positive rate as the answer",
-   "Needs a normal approximation",
-   "Fraud rate should be squared"
+   "Ignores the 1% base rate; P(fraud|flag) ≈ 16%",
+   "The answer should be the 5% false-positive rate",
+   "Flags aren't independent across transactions",
+   "Needs a normal approximation for rare events"
   ]
  },
  {
@@ -852,10 +852,10 @@
   "details": "Phone wins in **both** strata (96% vs 90% on easy, 45% vs 40% on hard). Its overall rate is lower only because it gets mostly hard tickets. Ticket difficulty confounds the comparison.",
   "why": "Simpson's paradox",
   "flaws": [
-   "Simpson's paradox",
-   "Sample sizes are too small for any conclusion",
-   "Should test with a t-test",
-   "Averages must be weighted by resolution time"
+   "Simpson's paradox: phone wins in both tiers",
+   "Gap isn't significant with only 250 per channel",
+   "Rates should be weighted by resolution time",
+   "Hard tickets should be excluded as outliers"
   ]
  },
  {
@@ -898,10 +898,10 @@
   "details": "Adding pair probabilities counts overlapping events more than once (it's an upper bound and can exceed 1 for larger groups). Use the complement: everyone distinct.",
   "why": "Union bound treated as exact probability",
   "flaws": [
-   "Union bound treated as exact probability",
-   "Birthdays aren't uniformly distributed",
-   "Should use 366 days",
-   "Probability should be 23/365"
+   "Summing pair odds overcounts; true P ≈ 0.507",
+   "Should use 366 days to account for leap years",
+   "Pairs should be 23 × 22 = 506, not C(23,2)",
+   "Real birthdays cluster, so 1/365 is too low"
   ]
  },
  {
@@ -945,10 +945,10 @@
   "why": "Peeking inflates false positives",
   "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Under no effect, a daily p-value wanders and will dip below 0.05 by chance\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">days</text><text class=\"tx\" x=\"34\" y=\"14\">p-value</text><path class=\"ax2\" d=\"M30,132.5 L330,132.5\"/><text class=\"tx\" x=\"326\" y=\"128.5\" text-anchor=\"end\">0.05</text><path class=\"ln\" d=\"M30.0,82.5 L44.8,41.7 L59.5,61.4 L74.2,109.7 L89.0,116.3 L103.8,74.5 L118.5,46.7 L133.2,71.4 L148.0,110.2 L162.8,107.2 L177.5,69.3 L192.2,52.6 L207.0,79.3 L221.8,108.9 L236.5,99.1 L251.2,66.4 L266.0,58.7 L280.8,85.2 L295.5,106.2 L310.2,92.2 L325.0,65.4\"/><circle class=\"dot\" cx=\"133.25\" cy=\"71.44478345964225\" r=\"4\"/></svg><figcaption>Under no effect, a daily p-value wanders and will dip below 0.05 by chance</figcaption></figure>",
   "flaws": [
-   "Peeking inflates false positives",
-   "Daily checks reduce power",
-   "Sample is too small",
-   "Significance threshold should be 0.01"
+   "Daily peeking inflates the false-positive rate",
+   "Stopping early only reduces power, not validity",
+   "Morning checks miss evening traffic patterns",
+   "p-values only update after full weekly cycles"
   ]
  },
  {
@@ -1012,10 +1012,10 @@
   "why": "Ignores sample ratio mismatch (SRM)",
   "vis": "| Arm | Expected | Observed | Gap |\n|---|---:|---:|---:|\n| Control | 50,000 | 50,800 | +800 |\n| Treatment | 50,000 | 49,200 | −800 |",
   "flaws": [
-   "Ignores sample ratio mismatch (SRM)",
-   "Imbalance is normal at this scale",
-   "Should rerun with a 49/51 split",
-   "SRM only matters for revenue metrics"
+   "50,800/49,200 fails an SRM chi-square test",
+   "1.6% imbalance only matters for revenue metrics",
+   "The lift should be reweighted to a 50/50 split",
+   "A bigger control arm makes the test conservative"
   ]
  },
  {
@@ -1038,10 +1038,10 @@
   "details": "With 20 independent metrics at $\\alpha = 0.05$, you expect about 1 false positive even if nothing changed. $P(\\text{at least one}) = 1 - 0.95^{20} \\approx 64\\%$. And the pre-registered primary metric is flat.",
   "why": "Multiple comparisons / cherry-picking",
   "flaws": [
-   "Multiple comparisons / cherry-picking",
-   "Metric was underpowered",
-   "Should have used a one-sided test",
-   "Effect size is too small to matter"
+   "1 of 20 metrics at p = 0.04 is expected by chance",
+   "Should have used a one-sided test on that metric",
+   "Time on settings needs a log transform first",
+   "p = 0.04 needs a t-test, not a z-test, here"
   ]
  },
  {
@@ -1085,10 +1085,10 @@
   "details": "Pageviews from the same user are correlated, so they're not independent trials. Treating 1.2M pageviews as independent understates the variance, often by a lot, because heavy users dominate. Since this is a ratio metric randomized by user, you need the delta method or a user-level bootstrap or cluster-robust SE.",
   "why": "Unit of analysis ≠ unit of randomization",
   "flaws": [
-   "Unit of analysis ≠ unit of randomization",
-   "CTR should be log-transformed",
-   "Should use a paired test",
-   "Users should be weighted by tenure"
+   "Pageviews aren't independent; analyze per user",
+   "CTR is a ratio, so it must be log-transformed",
+   "Two arms of 1.2M need a paired test instead",
+   "Pooled p should replace p in the SE formula"
   ]
  },
  {
@@ -1131,10 +1131,10 @@
   "details": "Clicking is chosen by the user and happens after treatment. Heavy messagers are more likely to click, so this compares engaged users against everyone, and randomization no longer protects the comparison.",
   "why": "Conditioning on a post-treatment behavior",
   "flaws": [
-   "Conditioning on a post-treatment behavior",
-   "Feature users are too few",
-   "Comparison needs a t-test, not a z-test",
-   "Should use median engagement"
+   "Clickers self-select; compare all treated users",
+   "Messages per user need a t-test, not a z-test",
+   "Medians should replace means for message counts",
+   "Control should be limited to heavy messagers"
   ]
  },
  {
@@ -1177,10 +1177,10 @@
   "details": "It picks a cause and an expensive fix with no evidence. A strong answer first rules out data problems, then narrows down where the drop is happening before forming hypotheses.",
   "why": "Jumps to a cause without diagnosis",
   "flaws": [
-   "Jumps to a cause without diagnosis",
-   "12% drop is within normal noise",
-   "Weekly is the wrong grain",
-   "Should compare to last year only"
+   "Picks a cause and acts before any diagnosis",
+   "12% weekly swings are normal noise for delivery",
+   "Should compare only to the same week last year",
+   "20% off is too small to win customers back"
   ]
  },
  {
@@ -1224,10 +1224,10 @@
   "why": "Wrong denominator (that's ARPPU)",
   "vis": "| Count | Value |\n|---|---:|\n| Active users | 10,000 |\n| Paying users | 1,000 |\n| Revenue | \\$50,000 |",
   "flaws": [
-   "Wrong denominator (that's ARPPU)",
-   "Should use median revenue",
-   "Monthly users include bots",
-   "ARPU should be annualized"
+   "Divides by payers; that's ARPPU, not ARPU",
+   "ARPU should use the median revenue, not the mean",
+   "ARPU must be annualized, so multiply by 12",
+   "Active users likely include bots; exclude them"
   ]
  },
  {
@@ -1270,10 +1270,10 @@
   "details": "Users who make playlists early were already more engaged, so motivation drives both the playlist and the retention. Forcing it changes who creates playlists, and the 2× gap won't carry over. It may even hurt onboarding completion.",
   "why": "Correlation ≠ causation (selection bias)",
   "flaws": [
-   "Correlation ≠ causation (selection bias)",
-   "Retention window is too short",
-   "2× is within sampling error",
-   "Should use a log-rank test"
+   "Playlist makers self-select; that's not causal",
+   "A 90-day window is too short to judge retention",
+   "2× could just be sampling error without a CI",
+   "Retention curves need a log-rank test first"
   ]
  },
  {
@@ -1296,10 +1296,10 @@
   "details": "A model that always predicts 'not fraud' also scores 99%. Accuracy tells you nothing at a 1% base rate.",
   "why": "Accuracy on imbalanced data",
   "flaws": [
-   "Accuracy on imbalanced data",
-   "99% accuracy indicates overfitting",
-   "Model should use more features",
-   "Accuracy should be computed on train"
+   "Predicting 'no fraud' always also scores 99%",
+   "99% test accuracy is a sign of overfitting",
+   "Accuracy should be measured on training data",
+   "Needs more features before production use"
   ]
  },
  {
@@ -1342,10 +1342,10 @@
   "details": "`account_closed_date` is filled in *because* the user churned, so it encodes the label. Pulling features from today's snapshot also leaks post-prediction information (e.g. days_since_last_login measured after the churn window). An AUC that high is a red flag, not a win.",
   "why": "Target leakage",
   "flaws": [
-   "Target leakage",
-   "AUC can't exceed 0.95",
-   "Model is underfitting",
-   "Class imbalance inflates AUC"
+   "account_closed_date leaks the churn label",
+   "AUC 0.99 means class imbalance inflated it",
+   "days_since_last_login should be log-scaled",
+   "Support tickets should be normalized by seats"
   ]
  },
  {
@@ -1389,10 +1389,10 @@
   "details": "With highly correlated predictors, the standard errors inflate ($\\text{VIF} \\approx 1/(1-0.95^2) \\approx 10$), and each coefficient only measures the effect *holding the other fixed*. num_rooms can be strongly tied to price on its own and still be insignificant next to sqft.",
   "why": "Misreading coefficients under multicollinearity",
   "flaws": [
-   "Misreading coefficients under multicollinearity",
-   "Coefficients must be standardized first",
-   "p-values are invalid for logistic models",
-   "Feature has too many missing values"
+   "Collinear with sqft; p = 0.4 ≠ no relationship",
+   "Must standardize features before reading p",
+   "num_rooms should be one-hot, not numeric",
+   "Price must be log-transformed before testing"
   ]
  },
  {
@@ -1435,10 +1435,10 @@
   "details": "Early lifts on UI changes are often novelty effects that fade, and 3 days doesn't cover a full weekly cycle. Run at least 1–2 full weeks, plot the effect by day, and compare new vs returning users (or cohort by first exposure) to see whether it decays.",
   "why": "Ignores novelty effect and weekly cycles",
   "flaws": [
-   "Ignores novelty effect and weekly cycles",
-   "3 days is enough with large traffic",
-   "Should run for exactly 7 days",
-   "Metric needs CUPED"
+   "3 days captures novelty, not a full week cycle",
+   "p = 0.001 is suspiciously small for 3 days",
+   "Clicks need CUPED adjustment before shipping",
+   "+6% clicks needs a Bonferroni correction too"
   ]
  },
  {
@@ -1481,10 +1481,10 @@
   "details": "Failing to reject doesn't prove the null. The CI still includes a meaningful +4% lift. To claim 'no meaningful effect,' run an equivalence test (TOST) against a pre-set margin, or get more power.",
   "why": "Absence of evidence ≠ evidence of absence",
   "flaws": [
-   "Absence of evidence ≠ evidence of absence",
-   "Should have used a one-sided test",
-   "Test must be rerun with Bonferroni",
-   "p > 0.05 proves no effect beyond 1%"
+   "A CI of [−1.5%, +4.0%] can't rule out effects",
+   "Should have run a one-sided test for a lift",
+   "p = 0.30 needs a Bonferroni adjustment first",
+   "A 90% CI should be reported, not a 95% one"
   ]
  },
  {
@@ -1507,10 +1507,10 @@
   "details": "Your first pick has a 1/3 chance of being right, and the host's informed reveal moves the remaining 2/3 onto the other closed door. Switching wins **2/3** of the time (simulated).",
   "why": "Ignores host's informed choice",
   "flaws": [
-   "Ignores host's informed choice",
-   "Probabilities are 1/2 after a door opens",
-   "Switching only helps with 4+ doors",
-   "Host chooses randomly so it doesn't matter"
+   "Host's informed choice makes switching 2/3",
+   "Switching only helps when there are 4+ doors",
+   "Door 1 was 1/3, so switching is also 1/3",
+   "Should condition on the car being behind door 2"
   ]
  },
  {
@@ -1533,10 +1533,10 @@
   "details": "The data stays skewed no matter how big n gets. The CLT says the **sampling distribution of the mean** becomes approximately normal, which is what the t-test needs. With extreme heavy tails (whales), convergence can be slow, so consider capping or winsorizing, or a bootstrap.",
   "why": "CLT is about the sampling distribution of the mean, not the data",
   "flaws": [
-   "CLT is about the sampling distribution of the mean, not the data",
-   "CLT requires normal data",
-   "CLT applies only for n > 1000",
-   "CLT says variance shrinks to zero"
+   "CLT normalizes the mean, not the raw data",
+   "CLT needs the raw data to be normal first",
+   "CLT only kicks in when n exceeds 100,000",
+   "CLT says sample variance shrinks to zero"
   ]
  },
  {
@@ -1560,10 +1560,10 @@
   "why": "Zero correlation ≠ independence",
   "vis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Y is fully determined by X, yet symmetric around 0\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">X</text><text class=\"tx\" x=\"34\" y=\"14\">Y = X²</text><path class=\"ln\" d=\"M30.0,26.2 L37.4,37.2 L44.8,47.6 L52.1,57.5 L59.5,66.7 L66.9,75.5 L74.2,83.6 L81.6,91.2 L89.0,98.2 L96.4,104.7 L103.8,110.6 L111.1,116.0 L118.5,120.8 L125.9,125.0 L133.2,128.6 L140.6,131.7 L148.0,134.2 L155.4,136.2 L162.8,137.6 L170.1,138.5 L177.5,138.8 L184.9,138.5 L192.2,137.6 L199.6,136.2 L207.0,134.2 L214.4,131.7 L221.8,128.6 L229.1,125.0 L236.5,120.8 L243.9,116.0 L251.2,110.6 L258.6,104.7 L266.0,98.2 L273.4,91.2 L280.8,83.6 L288.1,75.5 L295.5,66.7 L302.9,57.5 L310.2,47.6 L317.6,37.2 L325.0,26.2\"/><path class=\"ax2\" d=\"M177.5,12 L177.5,145\"/><text class=\"tx\" x=\"34\" y=\"160\" text-anchor=\"start\">−1</text><text class=\"tx\" x=\"325\" y=\"160\" text-anchor=\"end\">1</text></svg><figcaption>Y is fully determined by X, yet symmetric around 0</figcaption></figure>",
   "flaws": [
-   "Zero correlation ≠ independence",
-   "Correlation must be tested for significance",
-   "Pearson should be Spearman",
-   "Sample too small"
+   "Y = X² depends on X; zero corr ≠ independence",
+   "corr(X, X²) is actually positive, not zero",
+   "Should use Spearman since the link is nonlinear",
+   "Correlation must be tested for significance"
   ]
  },
  {
@@ -1627,10 +1627,10 @@
   "why": "Percent changes compound multiplicatively",
   "evis": "| Step | Multiplier | Value |\n|---|---:|---:|\n| Start | | 100 |\n| +50% | ×1.5 | 150 |\n| −50% | ×0.5 | **75** |",
   "flaws": [
-   "Percent changes compound multiplicatively",
-   "Percent changes add linearly",
-   "Should use log returns of 50%",
-   "Result depends on the order of changes"
+   "Changes compound: 1.5 × 0.5 = 0.75, so −25%",
+   "Log returns should be used; they net to 0%",
+   "Order matters: −50% then +50% would be 0%",
+   "Net change is +25% since gains compound first"
   ]
  },
  {
@@ -1654,10 +1654,10 @@
   "why": "That's overfitting (high variance), not underfitting",
   "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"99% train vs 70% validation sits on the overfitting side\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">model complexity</text><text class=\"tx\" x=\"34\" y=\"14\">error</text><path class=\"ln mut\" d=\"M30.0,38.7 L34.9,44.4 L39.8,49.8 L44.8,54.8 L49.7,59.6 L54.6,64.0 L59.5,68.3 L64.4,72.3 L69.3,76.0 L74.2,79.6 L79.2,82.9 L84.1,86.1 L89.0,89.1 L93.9,91.9 L98.8,94.6 L103.8,97.1 L108.7,99.4 L113.6,101.7 L118.5,103.8 L123.4,105.7 L128.3,107.6 L133.2,109.4 L138.2,111.0 L143.1,112.6 L148.0,114.1 L152.9,115.5 L157.8,116.8 L162.8,118.0 L167.7,119.2 L172.6,120.3 L177.5,121.4 L182.4,122.4 L187.3,123.3 L192.2,124.2 L197.2,125.0 L202.1,125.8 L207.0,126.5 L211.9,127.2 L216.8,127.9 L221.8,128.5 L226.7,129.1 L231.6,129.6 L236.5,130.1 L241.4,130.6 L246.3,131.1 L251.2,131.5 L256.2,131.9 L261.1,132.3 L266.0,132.7 L270.9,133.0 L275.8,133.3 L280.8,133.6 L285.7,133.9 L290.6,134.2 L295.5,134.5 L300.4,134.7 L305.3,134.9 L310.2,135.2 L315.2,135.4 L320.1,135.5 L325.0,135.7\"/><path class=\"ln\" d=\"M30.0,51.2 L34.9,56.7 L39.8,61.7 L44.8,66.3 L49.7,70.5 L54.6,74.3 L59.5,77.7 L64.4,80.9 L69.3,83.7 L74.2,86.3 L79.2,88.6 L84.1,90.6 L89.0,92.5 L93.9,94.1 L98.8,95.5 L103.8,96.8 L108.7,97.9 L113.6,98.8 L118.5,99.6 L123.4,100.2 L128.3,100.8 L133.2,101.2 L138.2,101.4 L143.1,101.6 L148.0,101.7 L152.9,101.7 L157.8,101.6 L162.8,101.4 L167.7,101.1 L172.6,100.7 L177.5,100.3 L182.4,99.8 L187.3,99.2 L192.2,98.6 L197.2,97.9 L202.1,97.1 L207.0,96.3 L211.9,95.5 L216.8,94.5 L221.8,93.6 L226.7,92.5 L231.6,91.5 L236.5,90.4 L241.4,89.2 L246.3,88.0 L251.2,86.7 L256.2,85.4 L261.1,84.1 L266.0,82.7 L270.9,81.3 L275.8,79.9 L280.8,78.4 L285.7,76.8 L290.6,75.3 L295.5,73.7 L300.4,72.0 L305.3,70.4 L310.2,68.6 L315.2,66.9 L320.1,65.1 L325.0,63.3\"/><circle class=\"dot\" cx=\"295.5\" cy=\"73.67375648799583\" r=\"4\"/><text class=\"tx\" x=\"295.5\" y=\"66.0\" text-anchor=\"middle\">you are here</text><text class=\"tx\" x=\"323\" y=\"129.0\" text-anchor=\"end\">train</text></svg><figcaption>99% train vs 70% validation sits on the overfitting side</figcaption></figure>",
   "flaws": [
-   "That's overfitting (high variance), not underfitting",
-   "That's underfitting (high bias)",
-   "Validation set is too small",
-   "Learning rate is too high"
+   "That gap is overfitting, not underfitting",
+   "Learning rate is too high for it to converge",
+   "The validation set is too small to trust 70%",
+   "Should compare on test data, not validation"
   ]
  },
  {
@@ -1721,10 +1721,10 @@
   "details": "Shuffling puts future weeks in the training folds, and lag and rolling features leak across folds, so the error estimate is too optimistic. Use forward-chaining (time-series split) with a gap.",
   "why": "Leaks the future into training",
   "flaws": [
-   "Leaks the future into training",
-   "Should use 10 folds",
-   "Should shuffle more",
-   "Stratify by target"
+   "Shuffled folds let training see the future",
+   "5 folds is too few; use 10 for stability",
+   "Folds should be stratified by demand level",
+   "Should report MAPE rather than RMSE for demand"
   ]
  },
  {
@@ -1768,10 +1768,10 @@
   "why": "Post-hoc segment fishing",
   "vis": "| Slice | Lift | p |\n|---|---:|---:|\n| Overall | ~0% | 0.40 |\n| Android (1 of 12 slices) | +4% | 0.03 |\n| Other 11 slices | mixed | > 0.05 |",
   "flaws": [
-   "Post-hoc segment fishing",
-   "Android sample too small",
-   "Should use a one-sided test for Android",
-   "Platform effects can't be measured"
+   "1 of 12 slices at p = 0.03 is likely chance",
+   "Android has too few users for a 12-way slice",
+   "Android should get a one-sided test instead",
+   "Platform effects can't be split by region"
   ]
  },
  {
@@ -1854,10 +1854,10 @@
   "details": "",
   "why": "Tree models are invariant to monotone feature scaling",
   "flaws": [
-   "Tree models are invariant to monotone feature scaling",
-   "Random forests need standardized features",
-   "Scaling only matters for regression trees",
-   "Should use min-max scaling"
+   "Trees ignore scale; standardizing is moot",
+   "Min-max scaling is needed, not standardizing",
+   "Scaling only matters for regression forests",
+   "Should log-transform skewed features instead"
   ]
  },
  {
@@ -1880,10 +1880,10 @@
   "details": "",
   "why": "Discrimination ≠ calibration",
   "flaws": [
-   "Discrimination ≠ calibration",
-   "AUC 0.9 means probabilities are within 10%",
-   "Should use accuracy instead",
-   "Probabilities require softmax"
+   "High AUC means good ranking, not calibration",
+   "AUC 0.9 means probabilities are off by ≤10%",
+   "Probabilities need softmax before the formula",
+   "Should use accuracy, not AUC, to judge it"
   ]
  },
  {
@@ -1906,10 +1906,10 @@
   "details": "It's reversed. Bagging fits deep, low-bias, high-variance trees in parallel on bootstrap samples and averages them, which reduces variance. Boosting fits shallow, high-bias learners sequentially, each fit to the current errors (negative gradients), which mainly reduces bias. Shrinkage and subsampling then keep variance under control.",
   "why": "Swapped bagging and boosting",
   "flaws": [
-   "Swapped bagging and boosting",
-   "Both average trees equally",
-   "Boosting trains trees in parallel",
-   "Boosting reduces variance by averaging independent trees"
+   "It swaps bagging and boosting's descriptions",
+   "Both mainly reduce variance by averaging trees",
+   "Boosting uses deep trees, so it reduces bias",
+   "Bagging cuts bias as much as it cuts variance"
   ]
  },
  {
@@ -1973,10 +1973,10 @@
   "why": "Ignores the learning_rate × n_estimators trade-off",
   "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Half the learning rate needs about twice the trees to reach its minimum\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">trees</text><text class=\"tx\" x=\"34\" y=\"14\">val loss</text><path class=\"ln mut\" d=\"M30.0,26.2 L34.9,35.0 L39.8,43.0 L44.8,50.2 L49.7,56.7 L54.6,62.5 L59.5,67.8 L64.4,72.6 L69.3,76.9 L74.2,80.8 L79.2,84.3 L84.1,87.4 L89.0,90.3 L93.9,92.8 L98.8,95.1 L103.8,97.2 L108.7,99.1 L113.6,100.7 L118.5,102.3 L123.4,103.6 L128.3,104.8 L133.2,105.9 L138.2,106.9 L143.1,107.7 L148.0,108.5 L152.9,109.2 L157.8,109.8 L162.8,110.3 L167.7,110.8 L172.6,111.2 L177.5,111.6 L182.4,111.9 L187.3,112.2 L192.2,112.4 L197.2,112.6 L202.1,112.8 L207.0,112.9 L211.9,113.1 L216.8,113.2 L221.8,113.2 L226.7,113.3 L231.6,113.3 L236.5,113.3 L241.4,113.4 L246.3,113.3 L251.2,113.3 L256.2,113.3 L261.1,113.3 L266.0,113.2 L270.9,113.2 L275.8,113.1 L280.8,113.1 L285.7,113.0 L290.6,112.9 L295.5,112.8 L300.4,112.7 L305.3,112.7 L310.2,112.6 L315.2,112.5 L320.1,112.4 L325.0,112.3\"/><path class=\"ln\" d=\"M30.0,28.8 L34.9,33.3 L39.8,37.5 L44.8,41.6 L49.7,45.5 L54.6,49.2 L59.5,52.7 L64.4,56.0 L69.3,59.2 L74.2,62.2 L79.2,65.0 L84.1,67.7 L89.0,70.3 L93.9,72.7 L98.8,75.1 L103.8,77.3 L108.7,79.4 L113.6,81.4 L118.5,83.3 L123.4,85.1 L128.3,86.8 L133.2,88.4 L138.2,89.9 L143.1,91.4 L148.0,92.8 L152.9,94.1 L157.8,95.3 L162.8,96.5 L167.7,97.6 L172.6,98.7 L177.5,99.7 L182.4,100.7 L187.3,101.6 L192.2,102.4 L197.2,103.2 L202.1,104.0 L207.0,104.8 L211.9,105.4 L216.8,106.1 L221.8,106.7 L226.7,107.3 L231.6,107.9 L236.5,108.4 L241.4,108.9 L246.3,109.4 L251.2,109.8 L256.2,110.2 L261.1,110.6 L266.0,111.0 L270.9,111.3 L275.8,111.7 L280.8,112.0 L285.7,112.3 L290.6,112.6 L295.5,112.8 L300.4,113.1 L305.3,113.3 L310.2,113.5 L315.2,113.7 L320.1,113.9 L325.0,114.1\"/><path class=\"ax2\" d=\"M177.5,12 L177.5,145\"/><text class=\"tx\" x=\"181.5\" y=\"22\" text-anchor=\"start\">500 trees</text><text class=\"tx\" x=\"323\" y=\"79.5\" text-anchor=\"end\">lr 0.1</text><text class=\"tx g\" x=\"323\" y=\"129.75\" text-anchor=\"end\">lr 0.05</text></svg><figcaption>Half the learning rate needs about twice the trees to reach its minimum</figcaption></figure>",
   "flaws": [
-   "Ignores the learning_rate × n_estimators trade-off",
-   "Lower learning rate always hurts accuracy",
-   "Learning rate only affects the first tree",
-   "Halving lr halves training time"
+   "Halving lr needs ~2× trees; 500 now underfits",
+   "Lower learning rates always reduce accuracy",
+   "learning_rate only scales the very first tree",
+   "Halving lr halves the training time per tree"
   ]
  },
  {
@@ -2000,10 +2000,10 @@
   "why": "Leaf-wise trees with 2^depth leaves are much deeper/more complex",
   "evis": "| | Depth-wise (XGBoost) | Leaf-wise (LightGBM) |\n|---|---|---|\n| Grows | every node at a level | the single best leaf |\n| Depth 8 | at most 256 leaves, balanced | 256 leaves can be very deep |\n| Risk | underuses leaves | overfits small data |\n| Safer setting | `max_depth = 8` | `num_leaves` ≈ 70 to 150, plus `max_depth` |",
   "flaws": [
-   "Leaf-wise trees with 2^depth leaves are much deeper/more complex",
-   "num_leaves should equal max_depth",
-   "Leaf-wise trees are shallower",
-   "LightGBM ignores max_depth"
+   "Leaf-wise 256 leaves can grow far past depth 8",
+   "num_leaves should be set to 8 to match depth",
+   "Leaf-wise trees are shallower at equal leaves",
+   "LightGBM ignores max_depth, so −1 is moot"
   ]
  },
  {
@@ -2047,9 +2047,9 @@
   "why": "It's a minimum Hessian sum, not a row count",
   "flaws": [
    "It's a minimum Hessian sum, not a row count",
-   "It's the minimum gain to split",
-   "It's an L1 penalty",
-   "It's the minimum depth"
+   "It's the minimum loss gain needed to split",
+   "It's an L1 penalty applied to leaf weights",
+   "It caps the number of rows a leaf can hold"
   ]
  },
  {
@@ -2092,10 +2092,10 @@
   "details": "Stochastic gradient boosting (Friedman 2002) draws a fraction of rows **without replacement** for each round. XGBoost's docs say it samples that fraction of the training instances before growing each tree. The trees are still added sequentially, not averaged. The randomness acts as regularization (less overfitting, often better generalization) and speeds up training. LightGBM's bagging_fraction also needs bagging_freq > 0 before it does anything.",
   "why": "Row subsampling is without replacement and boosting doesn't average",
   "flaws": [
-   "Row subsampling is without replacement and boosting doesn't average",
-   "subsample samples columns",
-   "subsample = 0.8 means 80% of trees are kept",
-   "Subsampling increases bias without reducing variance"
+   "Sampling is without replacement; no averaging",
+   "subsample picks 80% of the columns, not rows",
+   "It keeps 80% of trees in the final ensemble",
+   "Subsampling raises bias without cutting variance"
   ]
  },
  {
@@ -2118,10 +2118,10 @@
   "details": "Early stopping is a hyperparameter search over the number of rounds. Using the test set to choose that number leaks test information into the model, so the reported AUC is biased upward. With noisy metrics or small test sets the bias can be noticeable.",
   "why": "Test set used for model selection → optimistic estimate",
   "flaws": [
-   "Test set used for model selection → optimistic estimate",
-   "Early stopping patience too short",
-   "Should stop on training loss",
-   "Test set too small"
+   "Test set picks the trees, so its AUC is biased",
+   "Patience of 50 rounds is too short to settle",
+   "Early stopping should watch training loss",
+   "AUC should come from predict, not predict_proba"
   ]
  },
  {
@@ -2184,10 +2184,10 @@
   "details": "GOSS keeps the top a×100% of rows by |gradient| and **randomly samples** b×100% of the rest. It then multiplies the sampled small-gradient rows by $(1-a)/b$ when computing gain. Without that reweighting the data distribution shifts and the gain estimate is biased. With it, Ke et al. (2017) show the estimate stays accurate.",
   "why": "Omits random sampling + re-weighting of small-gradient rows",
   "flaws": [
-   "Omits random sampling + re-weighting of small-gradient rows",
-   "GOSS keeps only small-gradient rows",
-   "GOSS samples columns",
-   "GOSS is just random sampling"
+   "GOSS samples and upweights small-gradient rows",
+   "GOSS keeps small-gradient rows, drops large",
+   "GOSS samples features, not rows, each round",
+   "GOSS is plain uniform random row sampling"
   ]
  },
  {
@@ -2250,10 +2250,10 @@
   "details": "CatBoost only one-hot encodes categoricals with at most `one_hot_max_size` levels, which defaults to a small number like 2. Everything else gets **ordered target statistics**: each row's encoding is a smoothed mean of the target over rows with the same category that come *earlier* in a random permutation, plus a prior. This avoids the target leakage of naive mean encoding. It also builds combinations of categorical features greedily.",
   "why": "CatBoost uses ordered target statistics; one-hot only for tiny cardinalities",
   "flaws": [
-   "CatBoost uses ordered target statistics; one-hot only for tiny cardinalities",
-   "CatBoost needs one-hot for all categoricals",
-   "CatBoost hashes categories",
-   "CatBoost drops rare categories"
+   "CatBoost uses ordered target stats, not one-hot",
+   "CatBoost hashes categories into fixed buckets",
+   "CatBoost drops levels rarer than 1% by default",
+   "CatBoost needs label-encoded ints, not strings"
   ]
  },
  {
@@ -2276,10 +2276,10 @@
   "details": "Each row's encoding includes its own label. For rare categories (1–3 rows) the feature nearly equals the target, so the GBM latches onto it. Training AUC looks great while validation collapses. A simulation where account_id has **no** real signal still gives the in-sample encoding a strong correlation with y in training and about 0 on holdout.",
   "why": "In-sample target encoding leaks each row's own label",
   "flaws": [
-   "In-sample target encoding leaks each row's own label",
-   "Smoothing parameter too low",
-   "Should use one-hot instead",
-   "Target encoding only works for regression"
+   "In-sample means leak each row's own label",
+   "Should one-hot account_id instead for a GBM",
+   "Target encoding only works for regression",
+   "transform('mean') misaligns rows to the index"
   ]
  },
  {
@@ -2302,10 +2302,10 @@
   "details": "Split counts favor continuous and high-cardinality features, which offer many candidate split points even when each split helps little. Gain is better but can still be inconsistent. SHAP values are consistent and local (Lundberg et al. 2018/2020), and permutation importance on a holdout set is another good option. None of these say what causes churn. They describe what the model uses, and correlated proxies share or steal credit.",
   "why": "Split-count importance is biased, and no importance is causal",
   "flaws": [
-   "Split-count importance is biased, and no importance is causal",
-   "Gain importance is causal",
-   "Permutation importance is biased toward high cardinality",
-   "SHAP is identical to split count"
+   "Split counts are biased, and none are causal",
+   "Should use gain importance, which is causal",
+   "Permutation importance favors high cardinality",
+   "SHAP gives the same ranking as split counts"
   ]
  },
  {
@@ -2348,10 +2348,10 @@
   "details": "Up-weighting positives 99× makes the model act as if the prior were about 50%, so predicted probabilities are badly inflated. XGBoost's docs say that if you care about predicting the right probability, you can't re-balance the dataset this way. Weighting can help ranking (AUC), but probabilities need recalibration (or don't reweight at all) before they go into expected-value math.",
   "why": "Class re-weighting distorts probabilities",
   "flaws": [
-   "Class re-weighting distorts probabilities",
-   "scale_pos_weight changes the tree depth",
-   "It only affects ranking, not probabilities",
-   "Should set it to 1"
+   "Upweighting positives inflates probabilities",
+   "scale_pos_weight should be √99 ≈ 10 instead",
+   "It changes ranking but leaves probabilities",
+   "scale_pos_weight caps the maximum tree depth"
   ]
  },
  {
@@ -2414,10 +2414,10 @@
   "details": "Training-set predictions are over-fit and more extreme than out-of-sample ones, so a calibrator fit on them learns the wrong mapping. Use a held-out calibration set or cross-validated predictions (sklearn `CalibratedClassifierCV` with cv). Isotonic also needs a fair amount of data (with small samples, Platt/sigmoid scaling is safer) and can overfit.",
   "why": "Calibrating on the training predictions",
   "flaws": [
-   "Calibrating on the training predictions",
-   "Isotonic needs more trees",
-   "Calibration should use the test set",
-   "Platt scaling can't be used with GBMs"
+   "Fit on train predictions, which are overfit",
+   "Isotonic needs more trees to calibrate well",
+   "Platt scaling is required for GBM outputs",
+   "Isotonic can't handle over-confident scores"
   ]
  },
  {
@@ -2460,10 +2460,10 @@
   "details": "The defaults are right, but XGBoost has `grow_policy='lossguide'` (with the hist method) for leaf-wise growth, plus max_leaves. Leaf-wise growth also isn't automatically more accurate. It reaches lower loss with the same number of leaves, but it can overfit small data. Differences in speed and accuracy between tuned libraries are usually small and depend on the dataset.",
   "why": "XGBoost supports grow_policy='lossguide'",
   "flaws": [
-   "XGBoost supports grow_policy='lossguide'",
-   "XGBoost is always depth-wise",
-   "Leaf-wise growth is LightGBM-only by patent",
-   "grow_policy only affects GPU"
+   "XGBoost can grow leaf-wise via 'lossguide'",
+   "Leaf-wise growth is patented by LightGBM",
+   "grow_policy only takes effect on GPU training",
+   "LightGBM is level-wise; XGBoost is leaf-wise"
   ]
  },
  {
@@ -2487,10 +2487,10 @@
   "why": "Tree ensembles can't extrapolate beyond the training range",
   "vis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Training data: linear growth 100 to 340 over 24 months\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">month</text><text class=\"tx\" x=\"34\" y=\"14\">credits</text><path class=\"ln\" d=\"M30.0,132.5 L39.8,128.3 L49.7,124.2 L59.5,120.0 L69.3,115.8 L79.2,111.7 L89.0,107.5 L98.8,103.3 L108.7,99.2 L118.5,95.0 L128.3,90.8 L138.2,86.7 L148.0,82.5 L157.8,78.3 L167.7,74.2 L177.5,70.0 L187.3,65.8 L197.2,61.7 L207.0,57.5 L216.8,53.3 L226.7,49.2 L236.5,45.0 L246.3,40.8 L256.2,36.7 L266.0,32.5\"/><circle class=\"dot\" cx=\"325\" cy=\"7.5\" r=\"4\"/><text class=\"tx\" x=\"319\" y=\"24.0\" text-anchor=\"end\">month 30?</text></svg><figcaption>Training data: linear growth 100 to 340 over 24 months</figcaption></figure>",
   "flaws": [
-   "Tree ensembles can't extrapolate beyond the training range",
-   "Too few trees",
-   "Learning rate too high",
-   "Need more lag features"
+   "Trees can't extrapolate; it'll flatline ~340",
+   "Needs more trees to follow the linear trend",
+   "Learning rate is too high to fit the slope",
+   "Needs lag features to capture seasonality"
   ]
  },
  {
@@ -2534,10 +2534,10 @@
   "details": "",
   "why": "Raw residuals only for squared error",
   "flaws": [
-   "Raw residuals only for squared error",
-   "Residuals are the same for every loss",
-   "Hessians are ignored in GBMs",
-   "Gradients are only used in XGBoost"
+   "y − F is the negative gradient only for MSE",
+   "Hessians replace gradients for every loss",
+   "Gradients are used only in XGBoost, not GBM",
+   "Log loss trees fit y − F on the logit scale"
   ]
  },
  {
@@ -2560,10 +2560,10 @@
   "details": "",
   "why": "Leaf-wise growth overfits small data more readily",
   "flaws": [
-   "Leaf-wise growth overfits small data more readily",
-   "Too few trees for small data",
-   "Learning rate must be ≥ 0.3",
-   "Small data needs more leaves"
+   "Leaf-wise growth overfits small data faster",
+   "2,000 rows needs at least 1,000 boost rounds",
+   "Learning rate must be ≥ 0.3 for small data",
+   "Small data needs more leaves per tree, not fewer"
   ]
  },
  {
@@ -2606,10 +2606,10 @@
   "details": "",
   "why": "SHAP explains the model, not the world",
   "flaws": [
-   "SHAP explains the model, not the world",
-   "SHAP values are biased for trees",
-   "Need permutation importance instead",
-   "SHAP doesn't support interactions"
+   "SHAP explains the model, not causal effects",
+   "TreeSHAP values are biased for deep trees",
+   "Permutation importance should replace SHAP",
+   "SHAP ignores interactions with other features"
   ]
  },
  {
@@ -2652,10 +2652,10 @@
   "details": "",
   "why": "Smoothing reduces variance, not leakage",
   "flaws": [
-   "Smoothing reduces variance, not leakage",
-   "Smoothing removes leakage completely",
-   "More smoothing increases leakage",
-   "Leakage only happens with one-hot"
+   "Smoothing cuts noise, but labels still leak",
+   "More smoothing increases leakage, not less",
+   "Leakage only happens with one-hot encoding",
+   "The global mean should come from the test set"
   ]
  },
  {
@@ -2678,10 +2678,10 @@
   "details": "Finding a control for every treated unit estimates the **ATT**, $E[\\,Y(1) - Y(0) \\mid \\text{adopted}\\,]$, the effect on the kind of accounts that adopted. The ATE would also need to impute $Y(1)$ for the non-adopters, which can be very different (e.g. small accounts). For a decision like whether CodePilot paid off for adopters, the ATT is usually the right target. For whether to push it to everyone, you'd want the ATE or ATC.",
   "why": "Matching controls to treated units targets the ATT",
   "flaws": [
-   "Matching controls to treated units targets the ATT",
-   "Matching needs replacement to estimate any effect",
-   "1:1 matching can't produce standard errors",
-   "Matching estimates the effect on controls (ATC)"
+   "Matching controls to adopters estimates ATT",
+   "1:1 matching yields the ATC, not the ATE",
+   "Needs replacement to estimate any effect",
+   "1:1 matching can't give valid standard errors"
   ]
  },
  {
@@ -2725,10 +2725,10 @@
   "why": "Naive comparison = effect + selection bias",
   "vis": "<figure class=\"vis\"><pre class=\"mermaid\">flowchart TD\n  S[Account size and engineering headcount] --> D[Adopts CodePilot]\n  S --> Y[Monthly credits]\n  D -. effect? .-> Y</pre><figcaption>Size drives both adoption and credits, a backdoor path.</figcaption></figure>",
   "flaws": [
-   "Naive comparison = effect + selection bias",
-   "Difference is too small to be significant",
-   "Should use medians",
-   "Time trends don't cancel"
+   "Adopters were bigger already; that's selection",
+   "+1,300 isn't significant at this sample size",
+   "Should compare medians since credits skew",
+   "Same-period comparison double-counts trends"
   ]
  },
  {
@@ -2751,10 +2751,10 @@
   "details": "The propensity score is a balancing score for the covariates in the model (Rosenbaum & Rubin 1983). Conditioning on it balances observed X in expectation. Unobserved confounders such as an internal AI mandate at the customer, or an engineering leader's enthusiasm, stay unbalanced unless they're captured by X (lagged outcomes help, which is why we include them). Identification still rests on conditional ignorability.",
   "why": "PS only balances observed covariates",
   "flaws": [
-   "PS only balances observed covariates",
-   "PS balances unobserved covariates too",
-   "PS removes the need for overlap",
-   "PS gives the ATE automatically"
+   "Propensity scores balance only observed traits",
+   "Propensity matching removes the need for overlap",
+   "Propensity matching estimates the ATE by default",
+   "Lagged credits can't go into a propensity model"
   ]
  },
  {
@@ -2797,10 +2797,10 @@
   "details": "GenMatch optimizes **covariate balance**, not outcome prediction, and the design stage should never see post-treatment outcomes (Rubin's design-then-analyze principle). Balancing on post-period credits forces adopters and controls to have similar outcomes, which pushes the estimate toward 0 and makes the analysis open to specification searching. Pre-period credits (lags) are fine and encouraged.",
   "why": "Matching must be outcome-blind; post-period Y in balance = cheating",
   "flaws": [
-   "Matching must be outcome-blind; post-period Y in balance = cheating",
-   "GenMatch should optimize outcome fit",
-   "Post-period Y is fine if lagged",
-   "Including Y improves precision"
+   "Post-period Y makes matching outcome-aware",
+   "fit.func should optimize outcome fit instead",
+   "Post-period credits are fine if they're lagged",
+   "BalanceMatrix can't take more than 10 columns"
   ]
  },
  {
@@ -2843,10 +2843,10 @@
   "details": "Balance describes the matched sample, not a population hypothesis (Imai, King & Stuart 2008). p-values grow when you discard units, so you can 'improve' balance by shrinking the sample while the actual mean gaps get worse. Judge balance with SMDs, variance ratios, and eCDF/KS distances. GenMatch uses p-values internally only as an optimization loss across matchings at a fixed n.",
   "why": "Balance is a sample property; p-values depend on n",
   "flaws": [
-   "Balance is a sample property; p-values depend on n",
-   "p-values should be below 0.05",
-   "Should use Bonferroni on balance tests",
-   "Balance tests need large n"
+   "p-values track n, not the size of imbalance",
+   "p-values should be below 0.05 for balance",
+   "Balance t-tests need a Bonferroni correction",
+   "t-tests need at least 5,000 pairs to be valid"
   ]
  },
  {
@@ -2870,10 +2870,10 @@
   "why": "Mean balance ≠ distributional balance",
   "evis": "<figure class=\"vis\"><svg viewBox=\"0 0 340 170\" role=\"img\" aria-label=\"Same mean (SMD = 0), completely different shapes\" class=\"chart\"><path class=\"ax\" d=\"M30,10 L30,145 L330,145\"/><text class=\"tx\" x=\"330\" y=\"162\" text-anchor=\"end\">lagged credits</text><text class=\"tx\" x=\"34\" y=\"14\"></text><path class=\"ln\" d=\"M30.0,145.0 L34.9,145.0 L39.8,145.0 L44.8,145.0 L49.7,145.0 L54.6,145.0 L59.5,145.0 L64.4,145.0 L69.3,145.0 L74.2,145.0 L79.2,145.0 L84.1,145.0 L89.0,145.0 L93.9,145.0 L98.8,144.9 L103.8,144.8 L108.7,144.6 L113.6,144.1 L118.5,143.1 L123.4,141.4 L128.3,138.4 L133.2,133.7 L138.2,126.7 L143.1,116.9 L148.0,104.4 L152.9,89.6 L157.8,73.5 L162.8,57.8 L167.7,44.6 L172.6,35.6 L177.5,32.5 L182.4,35.6 L187.3,44.6 L192.2,57.8 L197.2,73.5 L202.1,89.6 L207.0,104.4 L211.9,116.9 L216.8,126.7 L221.8,133.7 L226.7,138.4 L231.6,141.4 L236.5,143.1 L241.4,144.1 L246.3,144.6 L251.2,144.8 L256.2,144.9 L261.1,145.0 L266.0,145.0 L270.9,145.0 L275.8,145.0 L280.8,145.0 L285.7,145.0 L290.6,145.0 L295.5,145.0 L300.4,145.0 L305.3,145.0 L310.2,145.0 L315.2,145.0 L320.1,145.0 L325.0,145.0\"/><path class=\"ln mut\" d=\"M30.0,138.1 L34.9,133.8 L39.8,127.9 L44.8,120.2 L49.7,111.2 L54.6,101.3 L59.5,91.7 L64.4,83.6 L69.3,78.2 L74.2,76.2 L79.2,78.2 L84.1,83.6 L89.0,91.7 L93.9,101.3 L98.8,111.2 L103.8,120.2 L108.7,127.9 L113.6,133.8 L118.5,138.1 L123.4,141.0 L128.3,142.8 L133.2,143.8 L138.2,144.4 L143.1,144.7 L148.0,144.9 L152.9,145.0 L157.8,145.0 L162.8,145.0 L167.7,145.0 L172.6,145.0 L177.5,145.0 L182.4,145.0 L187.3,145.0 L192.2,145.0 L197.2,145.0 L202.1,145.0 L207.0,144.9 L211.9,144.7 L216.8,144.4 L221.8,143.8 L226.7,142.8 L231.6,141.0 L236.5,138.1 L241.4,133.8 L246.3,127.9 L251.2,120.2 L256.2,111.2 L261.1,101.3 L266.0,91.7 L270.9,83.6 L275.8,78.2 L280.8,76.2 L285.7,78.2 L290.6,83.6 L295.5,91.7 L300.4,101.3 L305.3,111.2 L310.2,120.2 L315.2,127.9 L320.1,133.8 L325.0,138.1\"/><text class=\"tx g\" x=\"177.5\" y=\"26.5\" text-anchor=\"middle\">adopters</text><text class=\"tx\" x=\"74.25\" y=\"70.25\" text-anchor=\"middle\">controls</text><text class=\"tx\" x=\"280.75\" y=\"70.25\" text-anchor=\"middle\">controls</text></svg><figcaption>Same mean (SMD = 0), completely different shapes</figcaption></figure>",
   "flaws": [
-   "Mean balance ≠ distributional balance",
-   "SMD threshold should be 0.25",
-   "KS test is too strict",
-   "Means are all that matter for linear outcomes"
+   "Equal means can hide very different spreads",
+   "SMD of 0.00 suggests the matching overfit",
+   "KS tests are too strict for skewed credits",
+   "Means are all that matter for any outcome"
   ]
  },
  {
@@ -2896,10 +2896,10 @@
   "details": "Trimming is often wise, since extrapolating to unmatched giants relies on modeling. But the estimate becomes the ATT for adopters **within common support**, and the excluded 40 might have the largest effects. Say so explicitly and describe who was dropped.",
   "why": "Trimming changes the estimand",
   "flaws": [
-   "Trimming changes the estimand",
-   "Trimming always reduces bias",
-   "Trimming changes only the SE",
-   "Should trim controls, not treated"
+   "Dropping 40 giants changes who the ATT is for",
+   "Trimming always reduces bias and variance",
+   "Trimming affects only the SE, not the estimate",
+   "Should trim controls instead of adopters"
   ]
  },
  {
@@ -2943,10 +2943,10 @@
   "details": "Accounts chosen right after a spike will tend to drift back toward their usual level even if nothing happens (regression to the mean). Seasonality and other trends are also uncontrolled. Without matched controls who had similar spikes, the drop can't be attributed to CodePilot.",
   "why": "Regression to the mean + no control group",
   "flaws": [
-   "Regression to the mean + no control group",
-   "Sample too small",
-   "Should use median before/after",
-   "Seasonality is the only issue"
+   "Post-spike dip is mean reversion; no control",
+   "Before/after should compare medians, not means",
+   "Seasonality is the only issue to adjust for",
+   "A 10% drop is too small to be meaningful"
   ]
  },
  {
@@ -3011,10 +3011,10 @@
   "details": "Parallel trends is about the **post-period counterfactual**, which you never see. Flat pre-trends are supportive but don't prove it: a shock at adoption time could break it, and pre-trend tests are often underpowered (Roth 2022). Conditioning on passing a pre-test can even add bias. Report the test along with a sensitivity analysis (e.g. Rambachan & Roth's honest DiD).",
   "why": "Pre-trends can't verify post-period counterfactual trends",
   "flaws": [
-   "Pre-trends can't verify post-period counterfactual trends",
-   "Pre-trends test needs more periods",
-   "Should use a placebo outcome",
-   "Parallel trends can be proven with p > 0.05"
+   "Flat pre-trends can't prove post-period trends",
+   "The pre-trend test needs at least 12 periods",
+   "Should test a placebo outcome instead of leads",
+   "Event studies can't include pre-period leads"
   ]
  },
  {
@@ -3038,10 +3038,10 @@
   "why": "TWFE uses already-treated units as controls; negative weights",
   "evis": "| 2×2 comparison | Control group used | Weight can be |\n|---|---|---|\n| Early vs never adopters | never treated | positive |\n| Late vs never adopters | never treated | positive |\n| Late vs early (already treated) | **already treated** | **negative** |",
   "flaws": [
-   "TWFE uses already-treated units as controls; negative weights",
-   "TWFE is fine with staggered timing",
-   "Need more fixed effects",
-   "Should cluster by time"
+   "TWFE uses early adopters as controls for late",
+   "Needs account × month interaction fixed effects",
+   "Standard errors should be clustered by month",
+   "Staggered timing only affects the standard error"
   ]
  },
  {
@@ -3105,10 +3105,10 @@
   "why": "Conditioning on a mediator (post-treatment variable)",
   "vis": "<figure class=\"vis\"><pre class=\"mermaid\">flowchart TD\n  X[Pre-period covariates] --> D[Adopts CodePilot]\n  X --> Y[Credits]\n  D --> Q[Post-period queries]\n  Q --> Y\n  D -. direct .-> Y</pre><figcaption>Post-period queries sit downstream of adoption.</figcaption></figure>",
   "flaws": [
-   "Conditioning on a mediator (post-treatment variable)",
-   "Queries are a confounder to include",
-   "Matching on queries reduces variance only",
-   "Should match on post-period credits too"
+   "Post-period queries are a mediator of adoption",
+   "Should also match on post-period credits",
+   "Matching on queries only reduces variance",
+   "Query counts need log scaling before matching"
   ]
  },
  {
@@ -3151,10 +3151,10 @@
   "details": "$\\Gamma$ bounds how much an unobserved confounder could change the odds of treatment between two matched units that look the same on X. $\\Gamma = 2$ means the conclusion holds even if hidden bias made one unit in a pair up to 2× as likely to adopt. Larger $\\Gamma$ = more robust conclusion. It says nothing about the size of the effect.",
   "why": "Γ is about hidden-bias odds, not effect size",
   "flaws": [
-   "Γ is about hidden-bias odds, not effect size",
-   "Γ is the effect size",
-   "Γ = 2 means 2× the effect",
-   "Γ measures sample imbalance"
+   "Γ is hidden-bias odds, not the effect size",
+   "Γ measures imbalance left after matching",
+   "Γ = 2 means the p-value is twice as large",
+   "Γ = 2 means half the effect is confounded"
   ]
  },
  {
@@ -3197,10 +3197,10 @@
   "details": "Abadie & Imbens (2008) show the standard bootstrap is generally inconsistent for nearest-neighbor matching estimators with a fixed number of matches, because matching is non-smooth. Use the Abadie–Imbens (2006) analytic variance, which `Matching::Match` reports as 'AI SE', or a wild/weighted bootstrap built for matching, or regression on the matched sample with cluster-robust SEs (for matching without replacement).",
   "why": "The bootstrap is invalid for NN matching with replacement",
   "flaws": [
-   "The bootstrap is invalid for NN matching with replacement",
-   "SE should be from a t-test",
-   "Bootstrap is always valid",
-   "Matching has no sampling variance"
+   "Bootstrap fails for NN matching w/ replacement",
+   "SE should come from a simple paired t-test",
+   "Matching estimators have no sampling variance",
+   "Bootstrap needs 10,000 draws to be valid here"
   ]
  },
  {
@@ -3243,10 +3243,10 @@
   "details": "If adopters and non-adopters come from populations with different long-run means, matching on noisy pre-period levels picks controls who happened to be unusually high or low. Those controls then regress toward *their* group's mean after the cutoff, which creates a fake DiD effect (Daw & Hatfield 2018). Matching helps when selection really depends on the pre-period levels and hurts when it doesn't. Match on several lags or trends, check post-period placebo windows, and compare with plain DiD.",
   "why": "Matching on pre-period levels can induce regression-to-the-mean bias in DiD",
   "flaws": [
-   "Matching on pre-period levels can induce regression-to-the-mean bias in DiD",
-   "Matching + DiD is always safer",
-   "DiD doesn't need parallel trends after matching",
-   "Matching on levels eliminates RTM"
+   "Matching on levels can induce mean reversion",
+   "DiD no longer needs parallel trends after it",
+   "Matching on levels removes all mean reversion",
+   "Should match on post-period levels instead"
   ]
  },
  {
@@ -3269,10 +3269,10 @@
   "details": "",
   "why": "Balance only on observed covariates",
   "flaws": [
-   "Balance only on observed covariates",
-   "GenMatch balances unobservables via the genetic search",
-   "Adding the PS fixes hidden confounding",
-   "Balance implies unconfoundedness"
+   "Balance covers only the 30 measured traits",
+   "Genetic search balances unobservables too",
+   "Adding the propensity score fixes hidden bias",
+   "30 covariates is too many for GenMatch to fit"
   ]
  },
  {
@@ -3315,10 +3315,10 @@
   "details": "",
   "why": "E-values measure robustness, not proof",
   "flaws": [
-   "E-values measure robustness, not proof",
-   "E-value of 4 proves causality",
-   "E-value is the effect size",
-   "E-values only apply to RCTs"
+   "E-values gauge robustness; they don't prove",
+   "An E-value of 4 is the risk-ratio effect size",
+   "E-values only apply to randomized trials",
+   "E-value must exceed 10 to support causality"
   ]
  },
  {
@@ -3361,10 +3361,10 @@
   "details": "",
   "why": "Propensity models are for balance, not prediction",
   "flaws": [
-   "Propensity models are for balance, not prediction",
-   "High AUC means good balance",
-   "AUC should be above 0.99",
-   "Propensity model should be a GBM"
+   "High AUC means weak overlap, not less bias",
+   "A high AUC guarantees good covariate balance",
+   "Propensity AUC should be above 0.99 to work",
+   "Should use a GBM for the propensity model"
   ]
  },
  {
@@ -3378,9 +3378,9 @@
   "why": "SE computed per pageview when randomization is per user",
   "flaws": [
    "SE treats pageviews as independent units",
-   "Should have used a one-sided test",
-   "CTR needs a log transform before testing",
-   "Unequal pageview counts mean the split is broken (SRM)"
+   "Unequal pageviews (2.00M vs 2.02M) imply SRM",
+   "A one-sided test should be used for a lift",
+   "Pooled p should be used in the SE formula"
   ],
   "model": "Your sample size is the number of coins you flipped, not the number of times each coin landed.",
   "mech": "Users were randomized, so users are the independent units. One heavy user's 500 pageviews share a single taste for clicking, so they move together. Counting them as 500 separate trials makes the noise look far smaller than it is.",
@@ -3403,10 +3403,10 @@
   "verdict": "wrong",
   "why": "The covariate is measured after treatment, so the treatment can move it",
   "flaws": [
-   "Covariate is post-treatment, so it absorbs effect",
+   "Sessions during the test are post-treatment",
    "θ must be estimated separately in each arm",
-   "Variance only drops by ρ, not ρ²",
-   "CUPED needs the covariate to be binary"
+   "CUPED cuts variance by ρ, not by ρ² as claimed",
+   "CUPED needs a binary covariate to be valid"
   ],
   "model": "CUPED subtracts the part of Y you could have predicted before the coin flip. Anything measured after the flip might contain the effect itself.",
   "mech": "If the new checkout makes people come back more, sessions rise in treatment. CUPED then subtracts that extra activity as if it were noise, and part of the real effect goes with it.",
@@ -3470,9 +3470,9 @@
   "why": "Forgot to dilute the triggered lift by the triggered share of revenue",
   "flaws": [
    "Lift must be diluted by the triggered share",
-   "Triggered analysis is biased because triggering is post-treatment",
-   "Should have reported the median, not the mean",
-   "The +5% needs a Bonferroni correction"
+   "Triggering is post-treatment, so it's biased",
+   "Revenue lift should be reported as a median",
+   "The +5% needs a Bonferroni correction first"
   ],
   "model": "A 5% raise for one tenth of the team isn't a 5% raise for the team.",
   "mech": "The +5% applies only to the 10% slice of revenue that came from triggered users. The other 90% didn't change, so the overall lift is about 0.10 × 5% = 0.5%.",
@@ -3496,9 +3496,9 @@
   "why": "MDE scales with 1/√n, so doubling n only cuts it by about 29% (to ≈ 1.41%)",
   "flaws": [
    "MDE shrinks with √n, so only to about 1.41%",
-   "Doubling traffic changes α, not the MDE",
-   "MDE depends only on the baseline rate, not n",
-   "Should recompute with a one-sided test"
+   "Doubling traffic lowers α, not the MDE itself",
+   "MDE depends on the baseline rate, not on n",
+   "MDE must be recomputed one-sided at 100k"
   ],
   "model": "Precision grows with the square root of effort. To halve your blur, you need four times the data.",
   "mech": "Halving the variance shrinks the standard deviation (and the SE) by only √2. The MDE is a fixed multiple of the SE, so it falls from 2.0% to 2.0/1.414 ≈ 1.41%.",
@@ -3542,9 +3542,9 @@
   "why": "With shared, limited supply, treatment cannibalizes control, so the gap overstates the global effect",
   "flaws": [
    "Shared supply inflates the gap, not shrinks it",
-   "Rider-level randomization creates SRM",
-   "Discount tests need a holdout of drivers, not riders",
-   "Booking rate is a ratio metric that needs the delta method"
+   "Rider randomization causes sample ratio mismatch",
+   "Booking rate needs the delta method for its SE",
+   "Interference only affects the SE, not the gap"
   ],
   "model": "Two arms drinking from one well: if one sips harder, the other gets less. The difference between them is bigger than what happens when everyone sips harder.",
   "mech": "Discounted riders grab more of the fixed pool of drivers, so control riders find fewer cars and book less. The measured gap = true lift for treatment + the harm to control. Launched to everyone, there's no control to take supply from, so the real lift is smaller.",
@@ -3567,10 +3567,10 @@
   "verdict": "wrong",
   "why": "The stratifier is downstream of treatment, so stratifying on it is biased; the randomized aggregate is the causal answer",
   "flaws": [
-   "Stratifier is post-treatment; trust the aggregate",
+   "Strata are post-treatment; trust the aggregate",
    "Needs a chi-square test within each stratum",
-   "Simpson's paradox only happens with unequal arm sizes",
-   "Should weight strata by inverse variance"
+   "Simpson's only arises with unequal arm sizes",
+   "Strata should be weighted by inverse variance"
   ],
   "model": "With Simpson's, ask which way the arrows point. Stratify on causes of treatment, never on its consequences.",
   "mech": "Randomization balanced everything before the flow. 'Connect data' happens after, and the new flow changes who completes it. Comparing within strata compares different kinds of users, so the 'better in both' result can be pure selection.",
@@ -3594,10 +3594,10 @@
   "verdict": "wrong",
   "why": "Overlapping CIs do not imply non-significance; test the difference directly",
   "flaws": [
-   "CI overlap ≠ non-significance; test the difference",
-   "Should use 90% intervals for a two-sided test",
-   "The CIs are too wide because n is small",
-   "Should have used a paired test"
+   "Overlap ≠ non-significance; test the difference",
+   "Two-sided tests should compare 90% intervals",
+   "Intervals this wide mean the sample is small",
+   "Two arms' rates need a paired test instead"
   ],
   "model": "Two fuzzy dots can overlap while the gap between them is still clear. Look at the blur of the gap, not of each dot.",
   "mech": "The SE of a difference is √(SE_A² + SE_B²), which is smaller than SE_A + SE_B. Checking overlap effectively uses the sum, which is too wide.",
@@ -3621,9 +3621,9 @@
   "why": "Mann–Whitney tests a rank/distribution shift, not the mean; with n = 40k Welch's t (or bootstrap) on the mean is fine",
   "flaws": [
    "Mann–Whitney tests ranks, not the mean",
-   "Mann–Whitney requires equal sample sizes",
-   "Should log-transform and use a t-test on log revenue to test the mean",
-   "Non-normal data needs a chi-square test"
+   "Mann–Whitney needs equal sample sizes",
+   "A t-test on log revenue tests the mean",
+   "Zero-heavy revenue needs a chi-square test"
   ],
   "model": "Pick the test that asks your question. Ranks ask 'who usually wins?', means ask 'how much in total?'",
   "mech": "The t-test needs the **sample mean** to be roughly normal, not the data. With 40k users per arm the CLT gets you there even with skew (outliers widen the SE, which is honest). Mann–Whitney can be significant when means are equal, or miss a change driven by a few whales.",
@@ -3667,9 +3667,9 @@
   "why": "Includes users who haven't reached day 36 yet, so recent cohorts look artificially low",
   "flaws": [
    "Recent signups haven't had 36 days yet",
-   "LEFT JOIN should be an INNER JOIN",
-   "BETWEEN double-counts day 30",
-   "AVG over a 0/1 flag is invalid in SQL"
+   "LEFT JOIN should be INNER to drop inactives",
+   "BETWEEN double-counts day 30 and day 36",
+   "AVG over a 0/1 CASE flag is invalid SQL"
   ],
   "lang": "sql",
   "model": "You can't grade an exam the student hasn't sat yet.",
@@ -3712,10 +3712,10 @@
   "verdict": "wrong",
   "why": "Oversampling before splitting leaks synthetic copies of validation positives into training, and validates on synthetic, rebalanced data",
   "flaws": [
-   "SMOTE runs before the CV split",
-   "PR-AUC is undefined for imbalanced data",
+   "SMOTE runs on all data before the CV split",
+   "PR-AUC is undefined for 0.5%-positive data",
    "Needs StratifiedKFold with shuffle=False",
-   "SMOTE should only be applied to the negatives"
+   "SMOTE should oversample the negatives only"
   ],
   "lang": "python",
   "model": "Resampling is part of training. Anything that's part of training goes inside the fold.",
@@ -3739,9 +3739,9 @@
   "why": "Rows from the same customer land in both train and validation, so CV rewards memorizing customers",
   "flaws": [
    "Same customer lands in train and validation",
-   "Shuffling should be off for KFold",
-   "AUC is the wrong metric for churn",
-   "Five folds is too few for 24 rows per customer"
+   "AUC is the wrong metric for churn models",
+   "5 folds is too few with 24 rows per customer",
+   "Tenure should be dropped as a leaky feature"
   ],
   "model": "If the test has questions the student already saw with the answers, the score measures memory.",
   "mech": "With 24 near-identical rows per customer, the model learns each customer's quirks from training rows and recognizes them in validation. In production every customer is effectively new (or the future is unseen), so the advantage disappears.",
@@ -3785,9 +3785,9 @@
   "why": "The default frame is RANGE, so all orders on the same date get the same end-of-day total",
   "flaws": [
    "Default RANGE frame lumps same-day orders",
-   "SUM can't be used as a window function without PARTITION BY",
-   "Needs GROUP BY order_date",
-   "ORDER BY in the outer query changes the window result"
+   "SUM OVER needs a PARTITION BY to be valid",
+   "Needs GROUP BY order_date before the window",
+   "Outer ORDER BY changes the window's result"
   ],
   "lang": "sql",
   "model": "RANGE thinks in values, ROWS thinks in rows. Ties in the sort key are treated as one step under RANGE.",
@@ -3809,10 +3809,10 @@
   "verdict": "wrong",
   "why": "The encoder is fit on all rows, so every validation row's own target is baked into its feature",
   "flaws": [
-   "Encoder fit on all rows leaks validation labels",
+   "Encoder sees validation labels before CV",
    "Smoothing of 20 is too low for 900 levels",
-   "LightGBM can't use numeric encodings of categoricals",
-   "R² is the wrong metric for growth"
+   "LightGBM can't use numeric category encodings",
+   "R² is the wrong metric for growth targets"
   ],
   "lang": "python",
   "model": "A feature can't contain the answer it's being graded on. Fit the encoder inside each fold.",
@@ -3837,7 +3837,7 @@
   "flaws": [
    "Random split lets validation see the future",
    "early_stopping(100) patience is too short",
-   "num_boost_round must be ≤ 1000",
+   "num_boost_round=5000 overfits despite stopping",
    "Early stopping should monitor training loss"
   ],
   "lang": "python",
@@ -3861,10 +3861,10 @@
   "verdict": "wrong",
   "why": "With correlated features the model can route the signal through one of them; low SHAP means the model didn't use seats, not that seats is unrelated to churn",
   "flaws": [
-   "Correlated features hand off credit",
-   "SHAP values must be normalized before comparing",
-   "Mean |SHAP| should be replaced by mean SHAP",
-   "TreeSHAP is only exact for depth ≤ 3"
+   "Correlated features soak up seats' credit",
+   "SHAP values must be normalized to compare",
+   "Mean SHAP, not mean |SHAP|, shows relevance",
+   "TreeSHAP is only exact for depth ≤ 3 trees"
   ],
   "model": "SHAP explains the model's choices, not the world. If two features carry the same signal, the model may pick one and ignore the other.",
   "mech": "Trees split on whichever correlated feature looks slightly better at each node. Once `active_users_30d` captures the size signal, `seats` adds little, so its attributions shrink. Retrain without `active_users_30d` and `seats` would likely light up.",
@@ -3908,9 +3908,9 @@
   "why": "Quantile GBMs approximate quantiles; nothing guarantees coverage (and the two curves can even cross)",
   "flaws": [
    "Quantile models don't guarantee coverage",
-   "Pinball loss estimates the mean, not a quantile",
-   "Should use alpha = 0.2 and 0.8 for 80%",
-   "Quantile regression needs a log link"
+   "Pinball loss estimates the mean, not quantiles",
+   "Alphas should be 0.2 and 0.8 for an 80% band",
+   "Quantile objectives need a log link here"
   ],
   "model": "A model aimed at the 90th percentile is an estimate of it, not a promise. Coverage is something you check, not something you get for free.",
   "mech": "With finite data, regularization, and early stopping, the learned quantiles are biased and noisy, especially in sparse regions. The two models are trained independently, so q10 can exceed q90 for some rows. Real coverage is often well below 80%.",
@@ -3934,9 +3934,9 @@
   "why": "LightGBM's predict() already returns the response scale for tweedie; exponentiating again blows up predictions",
   "flaws": [
    "predict() already applies the inverse link",
-   "Tweedie power must be exactly 1 or 2",
-   "Tweedie can't handle exact zeros",
-   "Should use RMSE on log1p(credits) instead"
+   "Variance power must be exactly 1 or 2 here",
+   "Tweedie loss can't handle exact zeros in y",
+   "Should train RMSE on log1p(credits) instead"
   ],
   "model": "Know which side of the link function you're on. The model's score lives on the log scale; predict() hands you dollars, not logs.",
   "mech": "Internally the trees add up a log-mean score. LightGBM's predict() applies exp() for log-link objectives (poisson, gamma, tweedie) unless you ask for `raw_score=True`. Calling exp() again turns a prediction of 100 into e^100.",
@@ -3980,9 +3980,9 @@
   "why": "Not equivalent: native NaN handling learns the best side at every split; -999 is always forced to the low side",
   "flaws": [
    "NaN routing is learned; -999 is stuck low",
-   "Trees can't split on negative numbers",
-   "-999 changes the gradient of the loss",
-   "NaN must be imputed with the median for XGBoost"
+   "Trees can't split on negative feature values",
+   "-999 distorts the loss gradient for those rows",
+   "XGBoost needs NaN imputed with the median"
   ],
   "model": "NaN gets a free pass to whichever branch helps. -999 is stuck at the left end of the ruler.",
   "mech": "At each split XGBoost tries sending missing rows left and right and keeps the better one. With -999, missing rows always go wherever 'very small' values go. If missing behaves like 'very large' (never queried ≈ infinite days since), the model needs extra splits to carve them out, wasting depth.",
@@ -4005,10 +4005,10 @@
   "verdict": "wrong",
   "why": "Correlated features mask each other in permutation importance, and permuting one creates unrealistic rows",
   "flaws": [
-   "Correlated twins mask each other when shuffled",
-   "Permutation importance must be computed on training data",
-   "Permutation importance is only valid for linear models",
-   "Need to permute the target, not the features"
+   "Correlated twins mask each other's importance",
+   "Permutation importance needs training data",
+   "Permutation is only valid for linear models",
+   "You should permute the target, not features"
   ],
   "model": "If you hide one of two identical keys, the door still opens. Neither key looks important.",
   "mech": "Shuffling `credits_last_30d` breaks it, but the model can still lean on `credits_last_90d`, so the loss barely rises. The same happens in reverse. Also, the shuffled rows pair a high 30-day value with a low 90-day value, combinations that never occur, so the model is probed off its data.",
@@ -4071,10 +4071,10 @@
   "verdict": "wrong",
   "why": "The two are swapped: gamma is the split threshold, lambda is the L2 penalty on leaf weights",
   "flaws": [
-   "lambda and gamma are swapped",
-   "Leaf weight should be −G/H with no regularization",
-   "lambda is L1, not L2",
-   "gamma only applies to the root split"
+   "lambda and gamma definitions are swapped",
+   "Optimal leaf weight is −G/H, unregularized",
+   "lambda is the L1 penalty, not an L2 one",
+   "gamma applies only at the tree's root split"
   ],
   "model": "Gamma is the toll to build a new branch. Lambda is the brake on how far any leaf can move its prediction.",
   "mech": "Lambda sits in the denominator of the leaf weight, $-G/(H+\\lambda)$, pulling leaves with little Hessian mass toward zero. Gamma is subtracted from the split gain, so a split must improve loss by more than gamma to be kept.",
@@ -4098,8 +4098,8 @@
   "why": "PDPs average over unrealistic combinations when features are correlated, and averages hide this account's slice; plus it's still not causal",
   "flaws": [
    "PDP averages over impossible combinations",
-   "PDPs only work for linear models",
-   "Should have used gain importance instead",
+   "PDPs are only meaningful for linear models",
+   "Gain importance should answer this instead",
    "PDP must be computed on training data only"
   ],
   "model": "A PDP asks 'what if every account had 400 seats?', including tiny accounts that never could. That's a blend of real and imaginary customers.",
@@ -4124,9 +4124,9 @@
   "why": "The window is anchored on CURRENT_DATE, not the scoring date, so it includes October usage (the label period)",
   "flaws": [
    "Feature window runs past the scoring date",
-   "SUM should be AVG for a 30-day window",
-   "INNER JOIN drops zero-usage accounts but nothing else is wrong",
-   "Validation AUC close to training proves no leakage"
+   "SUM should be AVG for a 30-day usage window",
+   "Close train/val AUC proves there's no leakage",
+   "GROUP BY 1 groups on credits, not account"
   ],
   "lang": "text",
   "model": "Every feature needs an 'as of' date. Without one, today's knowledge leaks into yesterday's prediction.",
@@ -4150,9 +4150,9 @@
   "why": "Matching on a 6-month average can hide very different trends; adopters are growing and controls are flat",
   "flaws": [
    "Matched on the level, not the pre-trend",
-   "SMD of 0.01 is too small, suggesting overfitting",
-   "KS tests are invalid after matching",
-   "Should have matched on post-period credits too"
+   "SMD of 0.01 is so low it signals overfitting",
+   "KS tests aren't valid on matched samples",
+   "Should also match on post-period credits"
   ],
   "model": "Two cars can have the same average speed over the last hour while one is accelerating and the other is braking. Where they'll be next depends on the trajectory.",
   "mech": "Adopters tend to be accounts that were ramping up. Matching on the average pairs them with steady accounts of the same average. After adoption, adopters keep climbing because of their pre-existing momentum, and the gap gets credited to CodePilot.",
@@ -4176,10 +4176,10 @@
   "verdict": "wrong",
   "why": "Month t−1 is the trial month, already affected by the treatment (anticipation); the true start is the trial",
   "flaws": [
-   "t−1 is already affected by the trial",
-   "Should use t+1 instead to capture ramp-up",
-   "Recent lags are always worse predictors than older ones",
-   "Trial months should be dropped from the outcome window, not the matching"
+   "Month t−1 is the trial, so it's affected",
+   "Should match on t+1 to capture the ramp-up",
+   "Older lags predict better than recent ones",
+   "t−1 credits need log scaling before matching"
   ],
   "model": "'Pre-treatment' means before anything changed, not before the paperwork. Date the treatment from when it can first affect behavior.",
   "mech": "During the trial, adopters already use CodePilot, so t−1 credits are inflated. Matching them to controls with equally high t−1 credits (who got there naturally) erases the trial's boost from the comparison, and with regression to the mean the post-period gap can shrink or flip.",
@@ -4203,9 +4203,9 @@
   "why": "Survival is affected by both adoption and credit trajectory, so conditioning on it is collider/selection bias",
   "flaws": [
    "Filtering on survival conditions on a collider",
-   "Dormant accounts should be imputed as zero credits",
-   "6 months is too short a window",
-   "Symmetric rules are always unbiased"
+   "Six months is too short a survival window",
+   "The active-only filter mainly inflates the SE",
+   "Near-zero credits should be log-transformed"
   ],
   "model": "Applying the same filter to both groups is fair only if the filter is decided before treatment. A filter decided by the outcome race tilts the race.",
   "mech": "If CodePilot keeps marginal accounts alive, the adopter survivors include weaker, lower-credit accounts that would have gone dormant, while control survivors are only the strong ones. The comparison is then between different kinds of accounts, biasing the effect (here, toward zero or negative).",
@@ -4250,9 +4250,9 @@
   "why": "Reused controls are not independent observations; the t-test overstates precision and heavy reuse makes the estimate fragile",
   "flaws": [
    "Reused controls overstate the effective n",
-   "Matching with replacement is biased",
-   "Should have used a paired t-test on 1,200 pairs, which is valid",
-   "The bootstrap is the standard fix for NN matching with replacement"
+   "Matching with replacement is always biased",
+   "A paired t-test on the 1,200 pairs fixes it",
+   "Bootstrapping the matches is the standard fix"
   ],
   "model": "Counting the same witness 40 times doesn't give you 40 testimonies.",
   "mech": "Each reused control's noise enters the estimate many times, so its variance counts for more. Treating 1,200 control slots as 1,200 independent draws understates the SE. With one control used 40 times, its quirks drive a big slice of the result.",
@@ -4276,9 +4276,9 @@
   "why": "Spillover onto control siblings raises control credits, biasing the adopter-vs-control gap toward zero",
   "flaws": [
    "Spillover onto controls shrinks the gap",
-   "SUTVA is only about measurement error",
-   "Sibling accounts should be merged into adopters' outcomes",
-   "Spillover makes the SE invalid but not the point estimate"
+   "SUTVA concerns only outcome measurement error",
+   "Siblings' credits should count as adopters'",
+   "Spillover biases the SE, not the estimate"
   ],
   "model": "If the medicine also helps the people in the next bed, the treated-vs-untreated gap understates what the medicine does.",
   "mech": "Sibling controls get extra pipelines and queries from the adopter's work, so their credits rise too. The comparison subtracts some of the effect from itself.",
@@ -4302,9 +4302,9 @@
   "why": "Parallel trends is scale-dependent: parallel in levels with different baselines implies non-parallel in logs",
   "flaws": [
    "Parallel trends doesn't carry over to logs",
-   "Logs can't be used with DiD",
-   "Pre-trend flatness proves parallel trends",
-   "The 4× baseline gap invalidates any DiD"
+   "Log outcomes can't be used in a DiD model",
+   "Flat pre-trends prove parallel trends hold",
+   "A 4× baseline gap rules out DiD entirely"
   ],
   "model": "If both grow by +100 credits a month, the small account grows 10% and the big one 2.5%. Same steps, different percentages.",
   "mech": "Parallel trends is an assumption about the untreated changes on a particular scale. With a 4× baseline gap, equal additive trends become unequal percentage trends, so the log DiD picks up a spurious difference.",
@@ -4368,9 +4368,9 @@
   "why": "ATT applies to the kind of accounts that chose to adopt; non-adopters (ATU) likely gain less",
   "flaws": [
    "ATT doesn't transfer to non-adopters (ATU)",
-   "The CI should be divided by √7,800",
-   "ATT only applies to the matched controls",
-   "Effects can't be multiplied by counts"
+   "The CI should shrink by √7,800 when scaled",
+   "ATT only describes the matched controls",
+   "Effects can't be multiplied by account counts"
   ],
   "model": "People who sign up for the gym first are the ones who'll use it most. Their results don't transfer to the reluctant.",
   "mech": "Adopters are engineering-heavy, growing accounts with lots of code to write, exactly where an AI coding assistant pays off. Matching makes the comparison fair for them, but says nothing about accounts with little coding work. Pushed adoption also tends to mean lighter use.",
@@ -4414,9 +4414,9 @@
   "why": "A null placebo supports pre-period comparability but can't rule out confounders that change at the same time as adoption",
   "flaws": [
    "Can't detect shocks timed with adoption",
-   "The placebo window should be after adoption",
-   "A null placebo proves the opposite: that the effect is zero",
-   "Placebo tests require randomized data"
+   "Placebo window should come after adoption",
+   "A null placebo means the true effect is zero",
+   "Placebo tests only work with randomized data"
   ],
   "model": "A placebo is a smoke detector for things that were already burning. It can't hear a fire that starts the same day.",
   "mech": "If accounts adopt CodePilot because they're kicking off a big new data platform build, credits jump for that reason too, starting at adoption. There's no divergence 6 months earlier, so the placebo passes while the estimate still includes the project's credits.",
@@ -4439,10 +4439,10 @@
   "verdict": "wrong",
   "why": "Treatment is assigned at the org level, so errors must be clustered by org; account clustering overstates precision",
   "flaws": [
-   "Should cluster by org, where treatment is set",
-   "Should cluster by month instead",
-   "Clustering is unnecessary with matching",
-   "Use heteroskedasticity-robust (HC1) SEs without clustering"
+   "Cluster by org, where treatment is assigned",
+   "Should cluster by month to handle shocks",
+   "Clustering is unnecessary after matching",
+   "HC1 robust SEs are enough without clusters"
   ],
   "model": "You have as many independent experiments as independent decisions. Here, the org admin made the decision.",
   "mech": "Accounts in an org share the adoption decision and many shocks (budgets, migrations). Their outcomes move together, so they're not independent pieces of evidence. With ~1,400 orgs (and fewer adopting ones), the true SE is larger.",
